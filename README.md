@@ -4,13 +4,15 @@ Sistema de controle de jogos utilizando Visão Computacional.
 
 O projeto utiliza uma webcam para capturar os movimentos das mãos do usuário e traduzir gestos em comandos de teclado e mouse, permitindo controlar jogos sem o uso de periféricos tradicionais.
 
+A proposta é criar uma solução genérica, capaz de funcionar com diferentes jogos de computador sem necessidade de alteração interna no jogo. O sistema interpreta os gestos em tempo real e simula entradas de teclado e mouse.
+
+---
+
 ## 📌 Objetivo
 
-Desenvolver uma solução capaz de interpretar gestos em tempo real e convertê-los em ações dentro de jogos digitais.
+Desenvolver um sistema capaz de reconhecer gestos das mãos por meio da câmera e convertê-los em comandos utilizados em jogos digitais.
 
-A proposta é funcionar com qualquer jogo compatível com teclado e mouse, sem necessidade de modificações internas no jogo.
-
-Exemplos:
+O sistema pode ser utilizado em jogos que aceitam comandos de teclado e mouse, como:
 
 - Minecraft
 - Call of Duty
@@ -23,36 +25,129 @@ Exemplos:
 
 ## 🚀 Funcionalidades
 
-### Controle de Movimento
+- Detecção de mãos em tempo real
+- Reconhecimento de gestos por quantidade de dedos
+- Reconhecimento de pinças entre polegar e dedos
+- Simulação de teclado
+- Simulação de mouse
+- Controle do cursor pela mão direita
+- Mouse funcionando continuamente enquanto comandos são executados
+- Hub inicial para configurar os comandos antes de iniciar o controle
+- Mão fechada configurada como gesto neutro
+- Exibição opcional da câmera para testes e depuração
 
-A mão posicionada na área esquerda da câmera é responsável pelos comandos de teclado:
+---
 
-| Gesto | Comando |
-|---------|---------|
-| Punho fechado | Espaço |
-| 1 dedo | W |
-| 2 dedos | A |
-| 3 dedos | S |
-| 4 dedos | D |
+## 🧠 Como Funciona
 
-### Controle de Mouse
+Ao iniciar o programa, é aberto um hub de configuração.
 
-A mão posicionada na área direita da câmera é responsável pelo mouse:
+Nesse hub, o usuário pode escolher qual tecla ou ação será executada para cada gesto.
+
+Depois de iniciar o VisionControl, a câmera passa a reconhecer duas áreas principais:
+
+- **Mão esquerda:** comandos principais de teclado
+- **Mão direita:** controle do mouse e ações extras
+
+A tela da câmera é dividida em duas zonas:
+
+| Zona | Função |
+|---|---|
+| Lado esquerdo | Comandos de teclado |
+| Lado direito | Mouse e ações adicionais |
+
+---
+
+## ✋ Gesto Neutro
+
+A mão fechada não executa nenhuma ação.
+
+Isso evita comandos acidentais durante o jogo, já que abrir e fechar a mão naturalmente poderia atrapalhar a jogabilidade.
 
 | Gesto | Ação |
-|---------|---------|
-| Indicador levantado | Movimento do cursor |
-| Mão fechada | Clique esquerdo |
-| Mão aberta | Clique direito |
+|---|---|
+| Mão fechada | Neutro |
 
-### Recursos
+---
 
-- Rastreamento de mãos em tempo real
-- Controle de mouse por movimento da mão
-- Simulação de teclado
-- Simulação de cliques
-- Exibição opcional da câmera para depuração
-- Baixa latência
+## 🕹️ Mão Esquerda — Comandos Principais
+
+Por padrão, a mão esquerda é usada para os comandos principais de movimentação e ações do jogo.
+
+| Gesto | Comando padrão |
+|---|---|
+| Mão fechada | Neutro |
+| 1 dedo aberto | W |
+| 2 dedos abertos | A |
+| 3 dedos abertos | D |
+| 4 dedos abertos | S |
+| Pinça polegar + indicador | Espaço |
+| Pinça polegar + médio | Shift esquerdo |
+| Pinça polegar + anelar | Ctrl esquerdo |
+| Pinça polegar + mínimo | E |
+
+---
+
+## 🖱️ Mão Direita — Mouse e Ações
+
+A mão direita controla o mouse continuamente.
+
+O movimento do cursor é feito pelo centro da palma da mão, permitindo que o jogador continue mirando mesmo enquanto executa cliques ou comandos.
+
+| Gesto | Ação padrão |
+|---|---|
+| Movimento da palma | Movimento do mouse |
+| Mão fechada | Neutro |
+| Pinça polegar + indicador | Clique esquerdo |
+| Pinça polegar + médio | Clique direito |
+| 2 dedos abertos | R |
+| 3 dedos abertos | TAB |
+| 4 dedos abertos | 1 |
+| Pinça polegar + anelar | 2 |
+| Pinça polegar + mínimo | 3 |
+
+---
+
+## 🎯 Exemplo de Uso em Jogos
+
+Em um jogo de tiro, por exemplo:
+
+- A mão direita controla a mira
+- A pinça com indicador executa o clique esquerdo para atirar
+- A mira continua funcionando mesmo durante o clique
+- A mão esquerda pode controlar movimentação com W, A, S e D
+- Outros gestos podem ser usados para pular, correr, recarregar ou trocar de arma
+
+---
+
+## ⚙️ Hub de Configuração
+
+Antes do controle começar, o sistema abre uma janela de configuração.
+
+Nessa janela, o usuário pode alterar os comandos associados a cada gesto.
+
+Teclas disponíveis no hub:
+
+- W
+- A
+- S
+- D
+- E
+- R
+- TAB
+- 1
+- 2
+- 3
+- 4
+- Espaço
+- Ctrl esquerdo
+- Shift esquerdo
+- Alt esquerdo
+
+A mão direita também permite configurar:
+
+- Clique esquerdo
+- Clique direito
 
 ---
 
@@ -63,6 +158,7 @@ A mão posicionada na área direita da câmera é responsável pelo mouse:
 - MediaPipe
 - PyAutoGUI
 - PyDirectInput
+- Tkinter
 
 ---
 
@@ -74,7 +170,7 @@ Clone o repositório:
 git clone https://github.com/SEU-USUARIO/visioncontrol.git
 ```
 
-Entre na pasta:
+Entre na pasta do projeto:
 
 ```bash
 cd visioncontrol
@@ -84,21 +180,23 @@ cd visioncontrol
 
 ## 🐍 Criando a Virtual Environment
 
+É recomendado utilizar uma virtual environment para evitar conflito com outros projetos Python.
+
 ### Windows
 
-Criar ambiente virtual:
+Crie a venv:
 
 ```bash
 python -m venv venv
 ```
 
-Ativar ambiente virtual:
+Ative a venv:
 
 ```bash
 venv\Scripts\activate
 ```
 
-Após ativar, deverá aparecer algo semelhante:
+Após ativar, o terminal deve ficar parecido com:
 
 ```bash
 (venv) C:\Projetos\visioncontrol>
@@ -108,7 +206,7 @@ Após ativar, deverá aparecer algo semelhante:
 
 ## 📥 Instalando as Dependências
 
-Com a venv ativada:
+Com a venv ativada, instale os pacotes necessários:
 
 ```bash
 pip install -r requirements.txt
@@ -116,39 +214,80 @@ pip install -r requirements.txt
 
 ---
 
-## ▶ Executando
+## 📄 requirements.txt
 
-Com a venv ativada:
+O arquivo `requirements.txt` deve conter:
+
+```txt
+opencv-python==4.10.0.84
+mediapipe==0.10.14
+pydirectinput==1.0.4
+pyautogui==0.9.54
+```
+
+---
+
+## ▶️ Executando o Projeto
+
+Com a venv ativada, execute:
 
 ```bash
 python main.py
 ```
 
+Ao iniciar, o hub de configuração será aberto.
+
+Depois de configurar os comandos, clique em:
+
+```txt
+Iniciar VisionControl
+```
+
 ---
 
-## ⚙ Configuração
+## 🧪 Modo de Teste
 
-No início do arquivo existe a variável:
+No código existe a variável:
 
 ```python
 EXIBIR_CAMERA = True
 ```
 
-### True
+### `True`
 
-Abre uma janela exibindo:
+Abre uma janela mostrando:
 
-- câmera
-- landmarks da mão
-- gestos detectados
+- imagem da câmera
+- pontos das mãos
+- gesto detectado
+- ação executada
+- divisão entre mão esquerda e mão direita
 
-Útil para testes.
+Esse modo é recomendado para testes.
 
-### False
+### `False`
 
-Executa o reconhecimento em segundo plano.
+Executa o reconhecimento sem exibir a câmera.
 
-Reduz o consumo de CPU e melhora o desempenho durante os jogos.
+Esse modo pode reduzir o consumo de CPU durante os jogos.
+
+---
+
+## ⌨️ Encerrando o Programa
+
+Se a câmera estiver sendo exibida, pressione:
+
+```txt
+ESC
+```
+
+na janela da câmera.
+
+Também é possível encerrar pelo terminal com:
+
+```bash
+CTRL + C
+```
 
 ---
 
@@ -157,19 +296,36 @@ Reduz o consumo de CPU e melhora o desempenho durante os jogos.
 - Python 3.11
 - Webcam
 - Windows 10 ou superior
+- Jogo compatível com teclado e mouse
 
 ---
 
-## 🔒 Observações
+## ⚠️ Observações
 
-O projeto utiliza:
+O projeto utiliza simulação de teclado e mouse.
 
-- PyDirectInput
-- PyAutoGUI
+Por esse motivo, alguns jogos com sistemas anti-cheat podem bloquear ou ignorar entradas simuladas.
 
-para simular teclado e mouse.
+O desempenho pode variar de acordo com:
 
-Alguns jogos com sistemas anti-cheat podem bloquear entradas simuladas.
+- qualidade da webcam
+- iluminação do ambiente
+- capacidade do computador
+- quantidade de FPS da câmera
+- jogo executado ao mesmo tempo
+
+---
+
+## 💡 Recomendações de Uso
+
+Para melhor funcionamento:
+
+- Use o ambiente bem iluminado
+- Mantenha as mãos visíveis para a câmera
+- Evite fundo muito poluído
+- Teste os gestos antes de abrir o jogo
+- Ajuste os comandos no hub conforme o jogo escolhido
+- Use `EXIBIR_CAMERA = False` durante a gameplay para reduzir o consumo de CPU
 
 ---
 
