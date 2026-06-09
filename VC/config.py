@@ -21,46 +21,28 @@ MOUSE_AREA_Y_MAX = 0.85
 PINCH_DISTANCE = 0.055
 
 # =========================================================================
-# HUB DE CONFIGURAÇÃO
+# HUB DE CONFIGURAÇÃO DINÂMICA
 # =========================================================================
 
-KEY_OPTIONS = {
-    "Nenhum": None,
-    "W": "w",
-    "A": "a",
-    "S": "s",
-    "D": "d",
-    "E": "e",
-    "R": "r",
-    "TAB": "tab",
-    "1": "1",
-    "2": "2",
-    "3": "3",
-    "4": "4",
-    "Espaço": "space",
-    "CTRL esquerdo": "ctrlleft",
-    "SHIFT esquerdo": "shiftleft",
-    "ALT esquerdo": "altleft",
-}
-
+# Agora os dicionários guardam o valor exato que o sistema entende
 DEFAULT_LEFT_HAND = {
-    "1_DEDO": "W",
-    "2_DEDOS": "A",
-    "3_DEDOS": "D",
-    "4_DEDOS": "S",
-    "PINCA_INDICADOR": "Espaço",
-    "PINCA_MEDIO": "SHIFT esquerdo",
-    "PINCA_ANELAR": "CTRL esquerdo",
-    "PINCA_MINIMO": "E",
+    "1_DEDO": "w",
+    "2_DEDOS": "a",
+    "3_DEDOS": "d",
+    "4_DEDOS": "s",
+    "PINCA_INDICADOR": "space",
+    "PINCA_MEDIO": "shiftleft",
+    "PINCA_ANELAR": "ctrlleft",
+    "PINCA_MINIMO": "e",
 }
 
 DEFAULT_RIGHT_HAND = {
-    "1_DEDO": "Nenhum",
-    "2_DEDOS": "R",
-    "3_DEDOS": "TAB",
+    "1_DEDO": None,
+    "2_DEDOS": "r",
+    "3_DEDOS": "tab",
     "4_DEDOS": "1",
-    "PINCA_INDICADOR": "Clique esquerdo",
-    "PINCA_MEDIO": "Clique direito",
+    "PINCA_INDICADOR": "mouse_left",
+    "PINCA_MEDIO": "mouse_right",
     "PINCA_ANELAR": "2",
     "PINCA_MINIMO": "3",
 }
@@ -76,16 +58,31 @@ GESTURE_LABELS = {
     "PINCA_MINIMO": "Pinça polegar + mínimo",
 }
 
-RIGHT_HAND_OPTIONS = {
-    **KEY_OPTIONS,
-    "Clique esquerdo": "mouse_left",
-    "Clique direito": "mouse_right",
-}
+def get_display_name(key):
+    """Transforma a tecla técnica em um texto bonito para exibir no botão"""
+    if not key: return "Nenhum"
+    if key == "mouse_left": return "🖱️ Clique Esq"
+    if key == "mouse_right": return "🖱️ Clique Dir"
+    
+    nomes = {
+        "space": "Espaço",
+        "ctrlleft": "Ctrl Esq",
+        "shiftleft": "Shift Esq",
+        "altleft": "Alt Esq",
+        "enter": "Enter",
+        "up": "Seta Cima",
+        "down": "Seta Baixo",
+        "left": "Seta Esq",
+        "right": "Seta Dir",
+        "tab": "Tab",
+        "backspace": "Backspace"
+    }
+    return nomes.get(key, key.upper())
 
 def abrir_hub_configuracao():
     root = tk.Tk()
-    root.title("VisionControl - Hub de Configuração")
-    root.geometry("720x620")
+    root.title("VisionControl - Configuração")
+    root.geometry("650x620") 
     root.resizable(False, False)
 
     config = {
@@ -94,73 +91,123 @@ def abrir_hub_configuracao():
         "start": False,
     }
 
-    title = tk.Label(
-        root,
-        text="VisionControl - Configuração de Gestos",
-        font=("Arial", 16, "bold")
-    )
+    # Estados atuais das teclas
+    left_state = DEFAULT_LEFT_HAND.copy()
+    right_state = DEFAULT_RIGHT_HAND.copy()
+    
+    # Variável para saber qual botão está "escutando" o teclado no momento
+    active_listener = None
+
+    title = tk.Label(root, text="VisionControl - Gestos", font=("Arial", 16, "bold"))
     title.pack(pady=10)
 
     info = tk.Label(
         root,
-        text=(
-            "Punho fechado = neutro.\n"
-            "A mão direita controla o mouse o tempo todo pelo centro da palma.\n"
-            "Use pinça na mão direita para clicar enquanto continua mirando."
-        ),
+        text="Clique no botão da tecla e pressione a nova tecla do teclado.\n(Pressione ESC para limpar a tecla de um gesto)",
         font=("Arial", 10)
     )
     info.pack(pady=5)
 
-    main_frame = tk.Frame(root)
-    main_frame.pack(pady=10)
+    notebook = ttk.Notebook(root)
+    notebook.pack(pady=10, padx=20, expand=True, fill="both")
 
-    left_frame = tk.LabelFrame(main_frame, text="Mão esquerda - comandos principais", padx=10, pady=10)
-    left_frame.grid(row=0, column=0, padx=10, sticky="n")
+    aba_esquerda = ttk.Frame(notebook)
+    aba_direita = ttk.Frame(notebook)
 
-    right_frame = tk.LabelFrame(main_frame, text="Mão direita - mouse + ações", padx=10, pady=10)
-    right_frame.grid(row=0, column=1, padx=10, sticky="n")
+    notebook.add(aba_esquerda, text="Mão Esquerda")
+    notebook.add(aba_direita, text="Mão Direita (Mouse)")
 
-    left_vars = {}
-    right_vars = {}
+    left_frame = tk.Frame(aba_esquerda, padx=10, pady=10)
+    left_frame.pack(pady=10)
 
-    key_names = list(KEY_OPTIONS.keys())
-    right_names = list(RIGHT_HAND_OPTIONS.keys())
+    right_frame = tk.Frame(aba_direita, padx=10, pady=10)
+    right_frame.pack(pady=10)
 
+    # --- LÓGICA DINÂMICA (KEYBINDER) ---
+    def set_listener(btn, side, gesture_id):
+        nonlocal active_listener
+        # Se havia outro botão escutando, restaura o texto dele
+        if active_listener:
+            old_btn, old_side, old_gest = active_listener
+            val = left_state[old_gest] if old_side == 'left' else right_state[old_gest]
+            old_btn.config(text=get_display_name(val))
+            
+        active_listener = (btn, side, gesture_id)
+        btn.config(text="[ Pressione... ]")
+
+    def set_mouse_action(btn, side, gesture_id, action):
+        nonlocal active_listener
+        if active_listener and active_listener[0] == btn:
+            active_listener = None
+            
+        if side == 'left':
+            left_state[gesture_id] = action
+        else:
+            right_state[gesture_id] = action
+            
+        btn.config(text=get_display_name(action))
+
+    def on_key_press(event):
+        nonlocal active_listener
+        if not active_listener:
+            return
+            
+        btn, side, gesture_id = active_listener
+        keysym = event.keysym.lower()
+        
+        # Traduz a tecla capturada para o formato do pydirectinput
+        tk_to_pydi = {
+            "space": "space", "return": "enter", "escape": "none",
+            "control_l": "ctrlleft", "control_r": "ctrlright",
+            "shift_l": "shiftleft", "shift_r": "shiftright",
+            "alt_l": "altleft", "alt_r": "altright",
+            "prior": "pageup", "next": "pagedown",
+            "minus": "-", "equal": "=", "comma": ",", "period": ".",
+            "kp_0": "num0", "kp_1": "num1", "kp_2": "num2", "kp_3": "num3",
+        }
+        
+        pydi_key = tk_to_pydi.get(keysym, keysym)
+        if pydi_key == "none": # Usamos ESC para limpar o atalho
+            pydi_key = None
+            
+        # Salva o estado atualizado
+        if side == 'left':
+            left_state[gesture_id] = pydi_key
+        else:
+            right_state[gesture_id] = pydi_key
+            
+        btn.config(text=get_display_name(pydi_key))
+        active_listener = None
+
+    # Ouve os botões do teclado na janela inteira
+    root.bind('<Key>', on_key_press)
+
+    # --- DESENHANDO A INTERFACE ---
     for row, gesture_id in enumerate(GESTURE_LABELS):
-        label = tk.Label(left_frame, text=GESTURE_LABELS[gesture_id], anchor="w", width=25)
-        label.grid(row=row, column=0, padx=5, pady=5)
+        # === ABA ESQUERDA ===
+        tk.Label(left_frame, text=GESTURE_LABELS[gesture_id], anchor="w", width=22).grid(row=row, column=0, pady=5)
+        
+        btn_esq = tk.Button(left_frame, text=get_display_name(left_state.get(gesture_id)), width=14, font=("Arial", 9, "bold"))
+        btn_esq.config(command=lambda b=btn_esq, g=gesture_id: set_listener(b, 'left', g))
+        btn_esq.grid(row=row, column=1, padx=2)
+        
+        tk.Button(left_frame, text="🖱️ Esq", width=6, command=lambda b=btn_esq, g=gesture_id: set_mouse_action(b, 'left', g, 'mouse_left')).grid(row=row, column=2, padx=1)
+        tk.Button(left_frame, text="🖱️ Dir", width=6, command=lambda b=btn_esq, g=gesture_id: set_mouse_action(b, 'left', g, 'mouse_right')).grid(row=row, column=3, padx=1)
 
-        var = tk.StringVar(value=DEFAULT_LEFT_HAND.get(gesture_id, "Nenhum"))
-        combo = ttk.Combobox(left_frame, textvariable=var, values=key_names, state="readonly", width=18)
-        combo.grid(row=row, column=1, padx=5, pady=5)
+        # === ABA DIREITA ===
+        tk.Label(right_frame, text=GESTURE_LABELS[gesture_id], anchor="w", width=22).grid(row=row, column=0, pady=5)
+        
+        btn_dir = tk.Button(right_frame, text=get_display_name(right_state.get(gesture_id)), width=14, font=("Arial", 9, "bold"))
+        btn_dir.config(command=lambda b=btn_dir, g=gesture_id: set_listener(b, 'right', g))
+        btn_dir.grid(row=row, column=1, padx=2)
+        
+        tk.Button(right_frame, text="🖱️ Esq", width=6, command=lambda b=btn_dir, g=gesture_id: set_mouse_action(b, 'right', g, 'mouse_left')).grid(row=row, column=2, padx=1)
+        tk.Button(right_frame, text="🖱️ Dir", width=6, command=lambda b=btn_dir, g=gesture_id: set_mouse_action(b, 'right', g, 'mouse_right')).grid(row=row, column=3, padx=1)
 
-        left_vars[gesture_id] = var
-
-    for row, gesture_id in enumerate(GESTURE_LABELS):
-        label = tk.Label(right_frame, text=GESTURE_LABELS[gesture_id], anchor="w", width=25)
-        label.grid(row=row, column=0, padx=5, pady=5)
-
-        var = tk.StringVar(value=DEFAULT_RIGHT_HAND.get(gesture_id, "Nenhum"))
-        combo = ttk.Combobox(right_frame, textvariable=var, values=right_names, state="readonly", width=18)
-        combo.grid(row=row, column=1, padx=5, pady=5)
-
-        right_vars[gesture_id] = var
-
-    neutral_label = tk.Label(
-        root,
-        text="Importante: mão fechada não executa comando nenhum.",
-        font=("Arial", 10, "bold")
-    )
-    neutral_label.pack(pady=10)
-
+    # --- BOTÕES DE INICIAR/CANCELAR ---
     def iniciar():
-        for gesture_id, var in left_vars.items():
-            config["left"][gesture_id] = KEY_OPTIONS[var.get()]
-
-        for gesture_id, var in right_vars.items():
-            config["right"][gesture_id] = RIGHT_HAND_OPTIONS[var.get()]
-
+        config["left"] = left_state
+        config["right"] = right_state
         config["start"] = True
         root.destroy()
 
@@ -171,23 +218,8 @@ def abrir_hub_configuracao():
     button_frame = tk.Frame(root)
     button_frame.pack(pady=10)
 
-    start_button = tk.Button(
-        button_frame,
-        text="Iniciar VisionControl",
-        command=iniciar,
-        width=22,
-        height=2
-    )
-    start_button.grid(row=0, column=0, padx=10)
-
-    cancel_button = tk.Button(
-        button_frame,
-        text="Cancelar",
-        command=cancelar,
-        width=14,
-        height=2
-    )
-    cancel_button.grid(row=0, column=1, padx=10)
+    tk.Button(button_frame, text="Iniciar VisionControl", command=iniciar, width=22, height=2, bg="#4CAF50", fg="white", font=("Arial", 10, "bold")).grid(row=0, column=0, padx=10)
+    tk.Button(button_frame, text="Cancelar", command=cancelar, width=14, height=2).grid(row=0, column=1, padx=10)
 
     root.mainloop()
 
