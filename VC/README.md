@@ -1,16 +1,6 @@
-# VisionControl - Controle de Jogos por Gestos (Refatorado)
+# VisionControl - Controle de Jogos por Gestos
 
-Controle jogos usando a webcam e gestos das mãos, com detecção via MediaPipe.
-
-## O que mudou nesta versão
-
-### Problemas corrigidos
-- **Teclas especiais (Ctrl/Shift/Alt) nao ficam mais presas** - Sistema de watchdog monitora e solta automaticamente
-- **Modo Continuo vs Pulso funciona corretamente** - Checkbox "Segurar" na configuracao controla o comportamento
-- **Performance otimizada** - Frame skipping, model_complexity=0, e processamento eficiente
-- **Arquitetura limpa** - Codigo reorganizado em classes com responsabilidade unica
-- **Debounce robusto** - Gestos precisam ser confirmados por N frames antes de ativar
-- **Failsafe automatico** - Teclas sao soltas apos timeout se algo der errado
+Controle jogos usando a webcam e gestos das maos, com deteccao via MediaPipe.
 
 ## Instalacao
 
@@ -20,63 +10,72 @@ pip install -r requirements.txt
 
 ## Como usar
 
-1. Execute:
 ```bash
 python main.py
 ```
 
-2. Configure os gestos na interface que abrir:
-   - **Clique no botao da tecla** e pressione a tecla desejada
-   - **ESC** limpa a tecla
-   - **"Segurar"** marcado = tecla fica pressionada enquanto o gesto estiver ativo
-   - **"Segurar"** desmarcado = tecla da um unico clique na transicao do gesto
-   - Use **m. Esq / m. Dir** para configurar cliques do mouse
+### Passo 1: Configurar gestos
 
-3. Clique em **Iniciar VisionControl**
+Na aba **Mao Esquerda** e **Mao Direita**:
+- **Clique no botao da tecla** e pressione a tecla desejada (ESC limpa)
+- Use os botoes **Esq / Dir** para configurar cliques do mouse
+- **"Segurar" marcado**: a tecla fica pressionada enquanto o gesto estiver ativo (modo continuo)
+- **"Segurar" desmarcado**: a tecla da um unico clique na transicao do gesto (modo pulso)
 
-4. Na janela da camera:
-   - **Mao esquerda** (lado esquerdo da tela): Comandos do jogo (WASD, etc)
-   - **Mao direita** (lado direito da tela): Controla o mouse + acoes secundarias
-   - **Punho fechado** = neutro (sem acao)
-   - **ESC** na janela para fechar
+### Passo 2: Ajustar configuracoes
 
-## Configuracao dos gestos padrao
+Na aba **Configuracoes**:
 
-### Mao Esquerda (Movimentacao)
-| Gesto | Acao Padrao | Continuo |
-|-------|------------|----------|
-| 1 dedo | W (frente) | Sim |
-| 2 dedos | A (esquerda) | Sim |
-| 3 dedos | D (direita) | Sim |
-| 4 dedos | S (tras) | Sim |
-| Pinca Indicador | Espaco | Sim |
-| Pinca Medio | Shift | Sim |
-| Pinca Anelar | Ctrl | Sim |
-| Pinca Minimo | E | Sim |
+| Opcao | Descricao |
+|-------|-----------|
+| **Exibir janela da camera** | Liga/desliga a visualizacao da camera |
+| **Camera sempre por cima** | Janela fica sobre todas as outras (jogos em tela cheia) |
+| **Camera ID** | Seleciona qual camera usar (0, 1, 2...) |
+| **Sensib. Mouse** | Quanto maior, mais rapido o mouse se move (0.05 a 1.0) |
+| **Debounce** | Frames necessarios para confirmar um gesto (1-10) |
+| **Dist. Pinca** | Distancia para detectar pinca (menor = mais preciso) |
+| **Timeout** | Tempo para soltar tecla automaticamente se travar (ms) |
 
-### Mao Direita (Mouse + Acoes)
-| Gesto | Acao Padrao | Continuo |
-|-------|------------|----------|
-| 1 dedo | Nenhum | - |
-| 2 dedos | R | Sim |
-| 3 dedos | Tab | Sim |
-| 4 dedos | 1 | Sim |
-| Pinca Indicador | Clique Esq Mouse | Sim |
-| Pinca Medio | Clique Dir Mouse | Sim |
-| Pinca Anelar | 2 | Sim |
-| Pinca Minimo | 3 | Sim |
+### Passo 3: Iniciar
+
+Clique em **Iniciar VisionControl**. A janela da camera aparecera em um canto.
+
+## Controles durante o jogo
+
+| | Mao Esquerda (lado esquerdo da camera) | Mao Direita (lado direito da camera) |
+|---|---|---|
+| **1 dedo** | W (frente) | - |
+| **2 dedos** | A (esquerda) | R |
+| **3 dedos** | D (direita) | Tab |
+| **4 dedos** | S (tras) | 1 |
+| **Pinca Indicador** | Espaco | Clique Esquerdo Mouse |
+| **Pinca Medio** | Shift | Clique Direito Mouse |
+| **Pinca Anelar** | Ctrl | 2 |
+| **Pinca Minimo** | E | 3 |
+| **Punho fechado** | Neutro (sem acao) | Neutro (sem acao) |
+
+- A **mao direita** sempre controla o mouse, independente do gesto
+- O sistema usa **debounce** para evitar acionamentos acidentais
+- **Teclas modificadoras** (Ctrl, Shift, Alt) tem protecao anti-trava
 
 ## Dicas
 
-- Para **acoes unicas** (ex: recarregar, trocar arma), desmarque "Segurar"
-- Para **movimentacao**, mantenha "Segurar" marcado
-- A **mao direita** sempre controla o mouse, independente do gesto
-- Posicione a camera de frente, com boa iluminacao
-- A deteccao usa o lado da tela para separar mao esquerda/direita
+- **Para movimentacao** (WASD): mantenha "Segurar" marcado - as teclas ficam pressionadas enquanto voce mantem o gesto
+- **Para acoes unicas** (recarregar, trocar arma): desmarque "Segurar" - a tecla clica uma vez por gesto
+- Ajuste o **Debounce** se o controle estiver alternando gestos rapido demais
+- Ajuste a **Sensib. Mouse** se o cursor estiver muito lento ou rapido
+- Ative **"Camera por cima"** para ver a camera enquanto joga em tela cheia
 
-## Encerramento seguro
+## Encerramento
 
 - **ESC** na janela da camera, ou
 - **CTRL + C** no terminal
 
-Todas as teclas e botoes do mouse serao soltos automaticamente.
+Todas as teclas e botoes do mouse sao soltos automaticamente.
+
+## Dependencias
+
+- `opencv-python` - Captura e exibicao da camera
+- `mediapipe` - Deteccao de maos e gestos
+- `pynput` - Controle de teclado e mouse (mais robusto que pydirectinput)
+- `pyautogui` - Movimento do mouse
