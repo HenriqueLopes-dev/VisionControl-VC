@@ -6,7 +6,8 @@ import mediapipe as mp
 import time
 
 from config import (
-    CAMERA_WIDTH, CAMERA_HEIGHT, DEBOUNCE_FRAMES, PINCH_DISTANCE
+    CAMERA_WIDTH, CAMERA_HEIGHT, DEBOUNCE_FRAMES, PINCH_DISTANCE,
+    SIMPLE_ZONE_LABELS
 )
 from gestos import detectar_gesto
 from controles import InputController
@@ -25,6 +26,8 @@ class VisionControlApp:
         self.camera_id = self.settings.get("camera_id", 0)
         self.debounce_frames = self.settings.get("debounce_frames", DEBOUNCE_FRAMES)
         self.pinch_distance = self.settings.get("pinch_distance", PINCH_DISTANCE)
+        self.modo_simples_ativado = config.get("modo_simples_ativado", False)
+        self.config_simples = config.get("simples", {})
 
         # Atualiza o modulo gestos com a distancia de pinca customizada
         import gestos
@@ -68,6 +71,8 @@ class VisionControlApp:
         self.hud_left_acao = "Nenhum"
         self.hud_right_gesto = "Neutro"
         self.hud_right_acao = "Nenhum"
+        self.simple_zone_ativa = {z: False for z in SIMPLE_ZONE_LABELS}
+        self.simple_zone_hover = {z: False for z in SIMPLE_ZONE_LABELS}
 
         # FPS
         self.fps = 0
@@ -77,6 +82,14 @@ class VisionControlApp:
         # Landmarks para desenho (evita flickering entre frames processados)
         self.last_hand_landmarks = []
 
+        # Zonas do Modo Simples (normalizadas 0-1)
+        self.SIMPLE_ZONES = {
+            "S_CIMA": {"x_min": 0.28, "x_max": 0.72, "y_min": 0.02, "y_max": 0.22},
+            "S_BAIXO": {"x_min": 0.28, "x_max": 0.72, "y_min": 0.78, "y_max": 0.98},
+            "S_ESQUERDA": {"x_min": 0.02, "x_max": 0.22, "y_min": 0.28, "y_max": 0.72},
+            "S_DIREITA": {"x_min": 0.78, "x_max": 0.98, "y_min": 0.28, "y_max": 0.72},
+        }
+
     def start(self):
         print("=" * 50)
         print("VisionControl iniciado!")
@@ -85,8 +98,11 @@ class VisionControlApp:
         print(f"Topmost: {self.camera_topmost}")
         print(f"Debounce: {self.debounce_frames} frames")
         print(f"Dist. pinca: {self.pinch_distance}")
-        print("Punho fechado = neutro")
-        print("Mao direita = mouse + acoes")
+        if self.modo_simples_ativado:
+            print("MODO SIMPLES ATIVO (gestos e mouse desativados)")
+        else:
+            print("Punho fechado = neutro")
+            print("Mao direita = mouse + acoes")
         print("ESC na janela para fechar | CTRL + C no terminal")
         print("=" * 50)
 
@@ -100,6 +116,10 @@ class VisionControlApp:
                 cv2.setWindowProperty("VisionControl", cv2.WND_PROP_TOPMOST, 1)
 
         try:
+            if not self.cap.isOpened():
+                print("ERRO: Nao foi possivel abrir a camera.")
+                print("Verifique se a camera esta conectada e nao esta em uso por outro aplicativo.")
+                return
             self._main_loop()
         except KeyboardInterrupt:
             print("\nEncerrando pelo terminal...")
@@ -107,6 +127,7 @@ class VisionControlApp:
             self.shutdown()
 
     def _main_loop(self):
+        print("Loop principal iniciado.")
         while self.running and self.cap.isOpened():
             success, frame = self.cap.read()
             if not success:
@@ -142,12 +163,28 @@ class VisionControlApp:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb)
 
+        self.last_hand_landmarks = []
+
+        if self.modo_simples_ativado:
+            zonas = {z: False for z in SIMPLE_ZONE_LABELS}
+            if results.multi_hand_landmarks:
+                for hand_landmarks in results.multi_hand_landmarks:
+                    landmarks = hand_landmarks.landmark
+                    self.last_hand_landmarks.append(hand_landmarks)
+                    cx = sum(lm.x for lm in landmarks) / len(landmarks)
+                    cy = sum(lm.y for lm in landmarks) / len(landmarks)
+                    for zone_id, rect in self.SIMPLE_ZONES.items():
+                        if rect["x_min"] <= cx <= rect["x_max"] and rect["y_min"] <= cy <= rect["y_max"]:
+                            zonas[zone_id] = True
+            self.simple_zone_hover = zonas
+            self.input_ctrl.tick_modo_simples(self.config_simples, zonas)
+            return
+
         has_left = False
         has_right = False
         left_gesture_raw = "NEUTRO"
         right_gesture_raw = "NEUTRO"
 
-        self.last_hand_landmarks = []
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
                 landmarks = hand_landmarks.landmark
@@ -233,6 +270,10 @@ class VisionControlApp:
                 self.mp_draw.DrawingSpec(color=(0, 165, 255), thickness=2)
             )
 
+        if self.modo_simples_ativado:
+            self._draw_simple_zones(frame, frame_w, frame_h)
+            return
+
         # Overlay escuro para melhor legibilidade
         overlay = frame.copy()
         cv2.rectangle(overlay, (0, 0), (frame_w, 85), (0, 0, 0), -1)
@@ -260,6 +301,44 @@ class VisionControlApp:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 128, 0), 1)
 
         # Barra inferior
+        cv2.putText(frame, f"FPS: {self.fps}", (10, frame_h - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+        cv2.putText(frame, "ESC para sair", (frame_w - 110, frame_h - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (150, 150, 150), 1)
+
+    def _draw_simple_zones(self, frame, frame_w, frame_h):
+        """Desenha as 4 zonas do Modo Simples na tela."""
+        active_color = (0, 255, 0)
+        inactive_color = (50, 50, 50)
+
+        for zone_id in SIMPLE_ZONE_LABELS:
+            z = self.SIMPLE_ZONES[zone_id]
+            x1 = int(z["x_min"] * frame_w)
+            x2 = int(z["x_max"] * frame_w)
+            y1 = int(z["y_min"] * frame_h)
+            y2 = int(z["y_max"] * frame_h)
+
+            is_active = self.simple_zone_hover.get(zone_id, False)
+            color = active_color if is_active else inactive_color
+
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
+            cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            cfg = self.config_simples.get(zone_id, {})
+            key = cfg.get("acao")
+            label = SIMPLE_ZONE_LABELS[zone_id]
+            if key:
+                label += f" [{key.upper()}]"
+            text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+            tx = (x1 + x2 - text_size[0]) // 2
+            ty = (y1 + y2 + 5) // 2
+            cv2.putText(frame, label, (tx, ty),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        cv2.putText(frame, "MODO SIMPLES", (10, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         cv2.putText(frame, f"FPS: {self.fps}", (10, frame_h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
         cv2.putText(frame, "ESC para sair", (frame_w - 110, frame_h - 10),

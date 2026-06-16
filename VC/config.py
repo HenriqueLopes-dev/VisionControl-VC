@@ -1,8 +1,64 @@
 # =========================================================================
 # VisionControl - Configuracoes e Hub de Configuracao
 # =========================================================================
+import json
+import os
 import tkinter as tk
 from tkinter import ttk
+
+# Caminho do arquivo de configuracao
+CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+
+def criar_config_padrao():
+    """Cria e retorna um dicionario de configuracao padrao."""
+    config = {
+        "left": {},
+        "right": {},
+        "simples": {},
+        "modo_simples_ativado": False,
+        "settings": {
+            "exibir_camera": EXIBIR_CAMERA,
+            "camera_topmost": CAMERA_TOPMOST,
+            "camera_id": CAMERA_ID,
+            "smooth_factor": SMOOTH_FACTOR,
+            "debounce_frames": DEBOUNCE_FRAMES,
+            "pinch_distance": PINCH_DISTANCE,
+            "key_release_timeout": KEY_RELEASE_TIMEOUT,
+        }
+    }
+    for gest in GESTURE_LABELS:
+        config["left"][gest] = {
+            "acao": DEFAULT_LEFT_HAND.get(gest),
+            "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"],
+        }
+        config["right"][gest] = {
+            "acao": DEFAULT_RIGHT_HAND.get(gest),
+            "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"],
+        }
+    for zone_id, vals in DEFAULT_SIMPLE_MODE.items():
+        config["simples"][zone_id] = {
+            "acao": vals["acao"],
+            "continuo": vals["continuo"],
+        }
+    return config
+
+
+def salvar_config(config_dict):
+    """Salva o dicionario de configuracao em config.json."""
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(config_dict, f, indent=2, ensure_ascii=False)
+
+
+def carregar_config():
+    """Carrega config.json ou retorna None se nao existir."""
+    if not os.path.exists(CONFIG_FILE):
+        return None
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 # =========================================================================
 # CONSTANTES GLOBAIS (Valores padrao - podem ser sobrescritos pelo hub)
@@ -68,6 +124,23 @@ GESTURE_LABELS = {
     "PINCA_MEDIO": "Pinca polegar + medio",
     "PINCA_ANELAR": "Pinca polegar + anelar",
     "PINCA_MINIMO": "Pinca polegar + minimo",
+}
+
+# =========================================================================
+# MODO SIMPLES - Zonas na tela
+# =========================================================================
+SIMPLE_ZONE_LABELS = {
+    "S_CIMA": "Cima",
+    "S_BAIXO": "Baixo",
+    "S_ESQUERDA": "Esquerda",
+    "S_DIREITA": "Direita",
+}
+
+DEFAULT_SIMPLE_MODE = {
+    "S_CIMA": {"acao": "up", "continuo": False},
+    "S_BAIXO": {"acao": "down", "continuo": False},
+    "S_ESQUERDA": {"acao": "left", "continuo": False},
+    "S_DIREITA": {"acao": "right", "continuo": False},
 }
 
 # Teclas que sao modificadoras e precisam de cuidado especial
@@ -136,27 +209,37 @@ def normalize_key(key):
 
 def abrir_hub_configuracao():
     """Abre a janela de configuracao e retorna as configuracoes do usuario."""
+    # Se nao existir config.json, cria com valores padrao
+    if not os.path.exists(CONFIG_FILE):
+        salvar_config(criar_config_padrao())
+        print(f"Configuracao padrao salva em {CONFIG_FILE}")
+
     root = tk.Tk()
     root.title("VisionControl - Configuracao")
-    root.geometry("840x700")
-    root.resizable(False, False)
+    root.geometry("840x760")
+    root.resizable(True, True)
+    root.minsize(840, 600)
 
     # Garante que a janela aparece no centro da tela
     root.update_idletasks()
     x = (root.winfo_screenwidth() // 2) - (840 // 2)
-    y = (root.winfo_screenheight() // 2) - (700 // 2)
-    root.geometry(f"840x700+{x}+{y}")
+    y = (root.winfo_screenheight() // 2) - (760 // 2)
+    root.geometry(f"840x760+{x}+{y}")
 
     config = {
         "left": {},
         "right": {},
+        "simples": {},
+        "modo_simples_ativado": False,
         "start": False,
         "settings": {}
     }
     left_state = DEFAULT_LEFT_HAND.copy()
     right_state = DEFAULT_RIGHT_HAND.copy()
+    simple_state = {k: v["acao"] for k, v in DEFAULT_SIMPLE_MODE.items()}
     left_continuous = {}
     right_continuous = {}
+    simple_continuous = {}
     active_listener = [None]
 
     # Variaveis das configuracoes
@@ -172,8 +255,8 @@ def abrir_hub_configuracao():
     tk.Label(root, text="VisionControl", font=("Segoe UI", 18, "bold"), fg="#2196F3").pack(pady=(15, 5))
     tk.Label(
         root,
-        text="Configure os gestos de cada mao. Clique no botao e pressione a tecla desejada.\n"
-             "ESC limpa a tecla. 'Segurar' mantem a tecla pressionada enquanto o gesto estiver ativo.",
+        text="Configure os gestos ou o modo simples. Clique no botao e pressione a tecla desejada.\n"
+             "ESC limpa a tecla. 'Segurar' mantem a tecla pressionada enquanto o gesto/zona estiver ativo.",
         font=("Segoe UI", 10),
         fg="#666666"
     ).pack(pady=5)
@@ -195,22 +278,36 @@ def abrir_hub_configuracao():
     right_frame = tk.Frame(aba_direita, padx=10, pady=10)
     right_frame.pack(pady=10, expand=True)
 
+    def _resolve_side_state(side):
+        if side == "left":
+            return left_state
+        if side == "right":
+            return right_state
+        return simple_state
+
+    def _resolve_side_continuous(side):
+        if side == "left":
+            return left_continuous
+        if side == "right":
+            return right_continuous
+        return simple_continuous
+
     # --- LÓGICA DO KEY LISTENER ---
-    def set_listener(btn, side, gesture_id):
+    def set_listener(btn, side, zone_id):
+        state = _resolve_side_state(side)
         if active_listener[0]:
-            old_btn, old_side, old_gest = active_listener[0]
-            val = left_state[old_gest] if old_side == "left" else right_state[old_gest]
+            old_btn, old_side, old_zone = active_listener[0]
+            old_state = _resolve_side_state(old_side)
+            val = old_state.get(old_zone)
             old_btn.config(text=get_display_name(val), bg="SystemButtonFace")
-        active_listener[0] = (btn, side, gesture_id)
+        active_listener[0] = (btn, side, zone_id)
         btn.config(text="[ Pressione... ]", bg="#FFF3E0")
 
-    def set_mouse_action(btn, side, gesture_id, action):
+    def set_mouse_action(btn, side, zone_id, action):
         if active_listener[0] and active_listener[0][0] == btn:
             active_listener[0] = None
-        if side == "left":
-            left_state[gesture_id] = action
-        else:
-            right_state[gesture_id] = action
+        state = _resolve_side_state(side)
+        state[zone_id] = action
         btn.config(text=get_display_name(action), bg="SystemButtonFace")
 
     def on_key_press(event):
@@ -249,30 +346,28 @@ def abrir_hub_configuracao():
 
         internal_key = tk_to_internal.get(keysym, keysym)
 
-        if side == "left":
-            left_state[gesture_id] = internal_key
-        else:
-            right_state[gesture_id] = internal_key
+        state = _resolve_side_state(side)
+        state[gesture_id] = internal_key
 
         btn.config(text=get_display_name(internal_key), bg="SystemButtonFace")
         active_listener[0] = None
 
     root.bind("<Key>", on_key_press)
 
-    # --- TABELA DE CONFIGURACAO (Gestos) ---
-    def criar_tabela(parent_frame, side, state_dict, continuous_dict):
-        """Cria a tabela de gestos com label, botao de tecla, botoes de mouse e checkbox."""
+    # --- TABELA DE CONFIGURACAO (Gestos / Modo Simples) ---
+    def criar_tabela(parent_frame, side, state_dict, continuous_dict, labels_dict):
+        """Cria a tabela de zonas/gestos com label, botao de tecla, botoes de mouse e checkbox."""
         headers = ["Gesto", "Tecla", "Mouse", "Segurar"]
-        widths = [24, 14, 7, 8]
         for col, h in enumerate(headers):
             lbl = tk.Label(parent_frame, text=h, font=("Segoe UI", 9, "bold"), fg="#333333")
             lbl.grid(row=0, column=col, padx=3, pady=(0, 8))
 
-        for row, gesture_id in enumerate(GESTURE_LABELS, start=1):
-            # Label do gesto
+        buttons = {}
+        for row, zone_id in enumerate(labels_dict, start=1):
+            # Label
             tk.Label(
                 parent_frame,
-                text=GESTURE_LABELS[gesture_id],
+                text=labels_dict[zone_id],
                 anchor="w",
                 width=24,
                 font=("Segoe UI", 9)
@@ -281,13 +376,14 @@ def abrir_hub_configuracao():
             # Botao da tecla
             btn = tk.Button(
                 parent_frame,
-                text=get_display_name(state_dict.get(gesture_id)),
+                text=get_display_name(state_dict.get(zone_id)),
                 width=14,
                 font=("Segoe UI", 9, "bold"),
                 cursor="hand2"
             )
-            btn.config(command=lambda b=btn, g=gesture_id: set_listener(b, side, g))
+            btn.config(command=lambda b=btn, z=zone_id: set_listener(b, side, z))
             btn.grid(row=row, column=1, padx=3)
+            buttons[zone_id] = btn
 
             # Frame para botoes de mouse
             mouse_frame = tk.Frame(parent_frame)
@@ -298,7 +394,7 @@ def abrir_hub_configuracao():
                 text="Esq",
                 width=4,
                 font=("Segoe UI", 7),
-                command=lambda b=btn, g=gesture_id: set_mouse_action(b, side, g, "mouse_left")
+                command=lambda b=btn, z=zone_id: set_mouse_action(b, side, z, "mouse_left")
             ).pack(side=tk.LEFT, padx=1)
 
             tk.Button(
@@ -306,11 +402,11 @@ def abrir_hub_configuracao():
                 text="Dir",
                 width=4,
                 font=("Segoe UI", 7),
-                command=lambda b=btn, g=gesture_id: set_mouse_action(b, side, g, "mouse_right")
+                command=lambda b=btn, z=zone_id: set_mouse_action(b, side, z, "mouse_right")
             ).pack(side=tk.LEFT, padx=1)
 
-            # Checkbox continuo (padrao: True para movimento, False para acoes)
-            is_movement = gesture_id in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]
+            # Checkbox continuo
+            is_movement = zone_id in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]
             var = tk.BooleanVar(value=is_movement)
             chk = tk.Checkbutton(
                 parent_frame,
@@ -319,10 +415,52 @@ def abrir_hub_configuracao():
                 font=("Segoe UI", 8)
             )
             chk.grid(row=row, column=3, padx=5)
-            continuous_dict[gesture_id] = var
+            continuous_dict[zone_id] = var
 
-    criar_tabela(left_frame, "left", left_state, left_continuous)
-    criar_tabela(right_frame, "right", right_state, right_continuous)
+        return buttons
+
+    left_buttons = criar_tabela(left_frame, "left", left_state, left_continuous, GESTURE_LABELS)
+    right_buttons = criar_tabela(right_frame, "right", right_state, right_continuous, GESTURE_LABELS)
+
+    # --- ABA MODO SIMPLES ---
+    aba_simples = ttk.Frame(notebook)
+    notebook.add(aba_simples, text=" Modo Simples ")
+    simple_frame = tk.Frame(aba_simples, padx=10, pady=10)
+    simple_frame.pack(pady=10, expand=True)
+    simple_buttons = criar_tabela(simple_frame, "simples", simple_state, simple_continuous, SIMPLE_ZONE_LABELS)
+
+    # Carrega config salva e preenche a UI
+    saved_config = carregar_config()
+    if saved_config:
+        for gest in GESTURE_LABELS:
+            if gest in saved_config.get("left", {}):
+                acao = saved_config["left"][gest].get("acao")
+                left_state[gest] = acao
+                left_continuous[gest].set(saved_config["left"][gest].get("continuo", False))
+                left_buttons[gest].config(text=get_display_name(acao))
+            if gest in saved_config.get("right", {}):
+                acao = saved_config["right"][gest].get("acao")
+                right_state[gest] = acao
+                right_continuous[gest].set(saved_config["right"][gest].get("continuo", False))
+                right_buttons[gest].config(text=get_display_name(acao))
+
+        for zone_id in SIMPLE_ZONE_LABELS:
+            if zone_id in saved_config.get("simples", {}):
+                acao = saved_config["simples"][zone_id].get("acao")
+                simple_state[zone_id] = acao
+                simple_continuous[zone_id].set(saved_config["simples"][zone_id].get("continuo", False))
+                simple_buttons[zone_id].config(text=get_display_name(acao))
+
+        cfg = saved_config.get("settings", {})
+        var_exibir_camera.set(cfg.get("exibir_camera", EXIBIR_CAMERA))
+        var_camera_topmost.set(cfg.get("camera_topmost", CAMERA_TOPMOST))
+        var_camera_id.set(cfg.get("camera_id", CAMERA_ID))
+        var_smooth.set(cfg.get("smooth_factor", SMOOTH_FACTOR))
+        var_debounce.set(cfg.get("debounce_frames", DEBOUNCE_FRAMES))
+        var_pinch.set(cfg.get("pinch_distance", PINCH_DISTANCE))
+        var_timeout.set(cfg.get("key_release_timeout", KEY_RELEASE_TIMEOUT))
+        if "modo_simples_ativado" in saved_config:
+            config["modo_simples_ativado"] = saved_config["modo_simples_ativado"]
 
     # --- ABA CONFIGURACOES ---
     config_frame = tk.Frame(aba_config, padx=20, pady=20)
@@ -385,13 +523,22 @@ def abrir_hub_configuracao():
     tk.Label(config_frame, text="(soltar tecla automatico)", font=("Segoe UI", 8),
              fg="#999999").grid(row=6, column=2, pady=8, sticky="w")
 
+    # Modo Simples
+    tk.Label(config_frame, text="Modo:", font=("Segoe UI", 10, "bold"), anchor="w").grid(
+        row=7, column=0, pady=8, sticky="w"
+    )
+    var_modo_simples = tk.BooleanVar(value=config.get("modo_simples_ativado", False))
+    tk.Checkbutton(config_frame, text="Ativar Modo Simples (desativa gestos e mouse)",
+                   variable=var_modo_simples,
+                   font=("Segoe UI", 9)).grid(row=7, column=1, pady=8, sticky="w", padx=10)
+
     # Info
     tk.Label(
         config_frame,
         text="\nDica: Se o controle estiver 'travando', aumente o Debounce.\n"
              "Se as pincas nao funcionarem bem, ajuste a Distancia da Pinca.",
         font=("Segoe UI", 9), fg="#666666", justify=tk.LEFT
-    ).grid(row=7, column=0, columnspan=3, pady=15, sticky="w")
+    ).grid(row=8, column=0, columnspan=3, pady=15, sticky="w")
 
     # --- BOTOES INFERIORES ---
     button_frame = tk.Frame(root)
@@ -408,6 +555,14 @@ def abrir_hub_configuracao():
                 "continuo": right_continuous[gest].get()
             }
 
+        config["simples"] = {}
+        for zone_id in SIMPLE_ZONE_LABELS:
+            config["simples"][zone_id] = {
+                "acao": normalize_key(simple_state.get(zone_id)),
+                "continuo": simple_continuous[zone_id].get()
+            }
+        config["modo_simples_ativado"] = var_modo_simples.get()
+
         # Salva configuracoes
         config["settings"] = {
             "exibir_camera": var_exibir_camera.get(),
@@ -419,12 +574,52 @@ def abrir_hub_configuracao():
             "key_release_timeout": var_timeout.get(),
         }
 
+        salvar_config(config)
         config["start"] = True
         root.destroy()
 
     def cancelar():
         config["start"] = False
         root.destroy()
+
+    def copiar_configs():
+        """Monta o JSON das configs atuais e copia para a area de transferencia."""
+        cfg = {
+            "left": {},
+            "right": {},
+            "simples": {},
+            "modo_simples_ativado": False,
+            "settings": {}
+        }
+        for gest in GESTURE_LABELS:
+            cfg["left"][gest] = {
+                "acao": normalize_key(left_state.get(gest)),
+                "continuo": left_continuous[gest].get()
+            }
+            cfg["right"][gest] = {
+                "acao": normalize_key(right_state.get(gest)),
+                "continuo": right_continuous[gest].get()
+            }
+        for zone_id in SIMPLE_ZONE_LABELS:
+            cfg["simples"][zone_id] = {
+                "acao": normalize_key(simple_state.get(zone_id)),
+                "continuo": simple_continuous[zone_id].get()
+            }
+        cfg["modo_simples_ativado"] = var_modo_simples.get()
+        cfg["settings"] = {
+            "exibir_camera": var_exibir_camera.get(),
+            "camera_topmost": var_camera_topmost.get(),
+            "camera_id": var_camera_id.get(),
+            "smooth_factor": var_smooth.get(),
+            "debounce_frames": var_debounce.get(),
+            "pinch_distance": var_pinch.get(),
+            "key_release_timeout": var_timeout.get(),
+        }
+        texto = json.dumps(cfg, indent=2, ensure_ascii=False)
+        root.clipboard_clear()
+        root.clipboard_append(texto)
+        btn_copiar.config(text="Copiado!", bg="#C8E6C9")
+        root.after(1500, lambda: btn_copiar.config(text="Copiar Configs", bg="SystemButtonFace"))
 
     tk.Button(
         button_frame,
@@ -438,6 +633,17 @@ def abrir_hub_configuracao():
         cursor="hand2"
     ).grid(row=0, column=0, padx=10)
 
+    btn_copiar = tk.Button(
+        button_frame,
+        text="Copiar Configs",
+        command=copiar_configs,
+        width=14,
+        height=2,
+        font=("Segoe UI", 10),
+        cursor="hand2"
+    )
+    btn_copiar.grid(row=0, column=1, padx=10)
+
     tk.Button(
         button_frame,
         text="Cancelar",
@@ -446,7 +652,7 @@ def abrir_hub_configuracao():
         height=2,
         font=("Segoe UI", 10),
         cursor="hand2"
-    ).grid(row=0, column=1, padx=10)
+    ).grid(row=0, column=2, padx=10)
 
     root.mainloop()
 

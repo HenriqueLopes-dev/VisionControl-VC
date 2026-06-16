@@ -1,0 +1,99 @@
+{
+  "left": {
+    "1_DEDO": {
+      "acao": "w",
+      "continuo": true
+    },
+    "2_DEDOS": {
+      "acao": "a",
+      "continuo": false
+    },
+    "3_DEDOS": {
+      "acao": "d",
+      "continuo": true
+    },
+    "4_DEDOS": {
+      "acao": "s",
+      "continuo": false
+    },
+    "PINCA_INDICADOR": {
+      "acao": "space",
+      "continuo": false
+    },
+    "PINCA_MEDIO": {
+      "acao": "shift",
+      "continuo": false
+    },
+    "PINCA_ANELAR": {
+      "acao": "ctrl",
+      "continuo": false
+    },
+    "PINCA_MINIMO": {
+      "acao": "e",
+      "continuo": false
+    }
+  },
+  "right": {
+    "1_DEDO": {
+      "acao": null,
+      "continuo": true
+    },
+    "2_DEDOS": {
+      "acao": "r",
+      "continuo": true
+    },
+    "3_DEDOS": {
+      "acao": "tab",
+      "continuo": true
+    },
+    "4_DEDOS": {
+      "acao": "1",
+      "continuo": true
+    },
+    "PINCA_INDICADOR": {
+      "acao": "mouse_left",
+      "continuo": false
+    },
+    "PINCA_MEDIO": {
+      "acao": "mouse_right",
+      "continuo": false
+    },
+    "PINCA_ANELAR": {
+      "acao": "2",
+      "continuo": false
+    },
+    "PINCA_MINIMO": {
+      "acao": "3",
+      "continuo": false
+    }
+  },
+  "simples": {
+    "S_CIMA": {
+      "acao": "w",
+      "continuo": true
+    },
+    "S_BAIXO": {
+      "acao": "s",
+      "continuo": true
+    },
+    "S_ESQUERDA": {
+      "acao": "a",
+      "continuo": true
+    },
+    "S_DIREITA": {
+      "acao": "d",
+      "continuo": true
+    }
+  },
+  "modo_simples_ativado": true,
+  "start": false,
+  "settings": {
+    "exibir_camera": true,
+    "camera_topmost": true,
+    "camera_id": 0,
+    "smooth_factor": 0.35,
+    "debounce_frames": 3,
+    "pinch_distance": 0.04,
+    "key_release_timeout": 500
+  }
+}

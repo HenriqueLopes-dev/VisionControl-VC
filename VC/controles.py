@@ -80,6 +80,10 @@ class InputController:
         self._pulse_fired_left = {}
         self._pulse_fired_right = {}
 
+        # Modo Simples - estado das zonas
+        self._simple_zone_active = set()      # zonas atualmente ocupadas
+        self._simple_pulse_fired = set()      # zonas que ja dispararam pulso
+
         # Posicao suavizada do mouse
         self._mouse_x = None
         self._mouse_y = None
@@ -241,6 +245,8 @@ class InputController:
         self.release_all_mouse()
         self._pulse_fired_left.clear()
         self._pulse_fired_right.clear()
+        self._simple_zone_active.clear()
+        self._simple_pulse_fired.clear()
 
     # =====================================================================
     # MOUSE MOVEMENT
@@ -359,6 +365,37 @@ class InputController:
                 self._tap_key_async(key)
                 return f"Clique: {key.upper()}", self._gesto_label(gesture_id)
             return f"Aguardando...", self._gesto_label(gesture_id)
+
+    # =====================================================================
+    # MODO SIMPLES - Zonas na tela
+    # =====================================================================
+
+    def tick_modo_simples(self, config_simples, zonas_ocupadas):
+        """
+        Chamado a CADA frame quando o modo simples esta ativo.
+        zonas_ocupadas: dict {zone_id: True/False} indicando se ha mao dentro.
+        """
+        for zone_id, ocupada in zonas_ocupadas.items():
+            cfg = config_simples.get(zone_id, {"acao": None, "continuo": False})
+            key = cfg.get("acao")
+            is_continuous = cfg.get("continuo", False)
+
+            if not key:
+                continue
+
+            if ocupada:
+                if is_continuous:
+                    self._press_key(key)
+                    self._simple_zone_active.add(zone_id)
+                else:
+                    if zone_id not in self._simple_pulse_fired:
+                        self._simple_pulse_fired.add(zone_id)
+                        self._tap_key_async(key)
+            else:
+                if zone_id in self._simple_zone_active:
+                    self._release_key(key)
+                    self._simple_zone_active.discard(zone_id)
+                self._simple_pulse_fired.discard(zone_id)
 
     def on_mao_sumiu(self, side):
         """Chamado quando uma mao some da tela."""
