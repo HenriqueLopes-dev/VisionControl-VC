@@ -94,6 +94,10 @@
     "smooth_factor": 0.35,
     "debounce_frames": 1,
     "pinch_distance": 0.04,
-    "key_release_timeout": 500
+    "key_release_timeout": 500,
+    "exit_key": 27,
+    "exit_key_name": "ESC",
+    "config_key": 118,
+    "config_key_name": "V"
   }
 }

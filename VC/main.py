@@ -7,7 +7,7 @@ import time
 
 from config import (
     CAMERA_WIDTH, CAMERA_HEIGHT, DEBOUNCE_FRAMES, PINCH_DISTANCE,
-    SIMPLE_ZONE_LABELS
+    SIMPLE_ZONE_LABELS, EXIT_KEY, CONFIG_KEY
 )
 from gestos import detectar_gesto
 from controles import InputController
@@ -35,6 +35,9 @@ class VisionControlApp:
         self.pinch_distance = self.settings.get("pinch_distance", PINCH_DISTANCE)
         self.modo_simples_ativado = config.get("modo_simples_ativado", False)
         self.config_simples = config.get("simples", {})
+        self.exit_key = self.settings.get("exit_key", EXIT_KEY)
+        self.config_key = self.settings.get("config_key", CONFIG_KEY)
+        self.restart_requested = False
 
         # Atualiza o modulo gestos com a distancia de pinca customizada
         import gestos
@@ -110,7 +113,9 @@ class VisionControlApp:
         else:
             print("Punho fechado = neutro")
             print("Mao direita = mouse + acoes")
-        print("ESC na janela para fechar | CTRL + C no terminal")
+        exit_name = self.settings.get("exit_key_name", "ESC")
+        config_name = self.settings.get("config_key_name", "V")
+        print(f"{exit_name} para fechar | {config_name} para config | CTRL + C no terminal")
         print("=" * 50)
 
         self.input_ctrl.start_watchdog()
@@ -124,12 +129,15 @@ class VisionControlApp:
             if not self.cap.isOpened():
                 print("ERRO: Nao foi possivel abrir a camera.")
                 print("Verifique se a camera esta conectada e nao esta em uso por outro aplicativo.")
-                return
+                self.shutdown()
+                return self.restart_requested
             self._main_loop()
         except KeyboardInterrupt:
             print("\nEncerrando pelo terminal...")
         finally:
             self.shutdown()
+
+        return self.restart_requested
 
     def _main_loop(self):
         print("Loop principal iniciado.")
@@ -160,11 +168,18 @@ class VisionControlApp:
                 cv2.imshow("VisionControl", frame)
                 if self.camera_topmost:
                     cv2.setWindowProperty("VisionControl", _WND_PROP_TOPMOST, 1)
-                if cv2.waitKey(1) & 0xFF == 27:
+                key = cv2.waitKey(1) & 0xFF
+                if key == self.exit_key:
+                    self.running = False
+                    break
+                if key == self.config_key:
+                    self.restart_requested = True
                     self.running = False
                     break
             else:
-                cv2.waitKey(1)
+                if cv2.waitKey(1) & 0xFF == self.exit_key:
+                    self.running = False
+                    break
 
     def _process_frame(self, frame, frame_w, frame_h):
         # Reduz frame para processamento mais rapido
@@ -316,7 +331,9 @@ class VisionControlApp:
         # Barra inferior
         cv2.putText(frame, f"FPS: {self.fps}", (10, frame_h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, white, 1)
-        cv2.putText(frame, "ESC para sair", (frame_w - 110, frame_h - 10),
+        exit_label = self.settings.get("exit_key_name", "ESC")
+        config_label = self.settings.get("config_key_name", "V")
+        cv2.putText(frame, f"{exit_label} sair | {config_label} config", (frame_w - 180, frame_h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
 
     def _draw_simple_zones(self, frame, frame_w, frame_h):
@@ -354,7 +371,9 @@ class VisionControlApp:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         cv2.putText(frame, f"FPS: {self.fps}", (10, frame_h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, white, 1)
-        cv2.putText(frame, "ESC para sair", (frame_w - 110, frame_h - 10),
+        exit_label = self.settings.get("exit_key_name", "ESC")
+        config_label = self.settings.get("config_key_name", "V")
+        cv2.putText(frame, f"{exit_label} sair | {config_label} config", (frame_w - 180, frame_h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
 
     def shutdown(self):
@@ -375,10 +394,12 @@ class VisionControlApp:
 if __name__ == "__main__":
     from config import abrir_hub_configuracao
 
-    config = abrir_hub_configuracao()
-    if config is None:
-        print("VisionControl cancelado pelo usuario.")
-        raise SystemExit
+    restart = True
+    while restart:
+        config = abrir_hub_configuracao()
+        if config is None:
+            break
+        app = VisionControlApp(config)
+        restart = app.start()
 
-    app = VisionControlApp(config)
-    app.start()
+    print("VisionControl finalizado.")

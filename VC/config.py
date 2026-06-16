@@ -25,6 +25,10 @@ def criar_config_padrao():
             "debounce_frames": DEBOUNCE_FRAMES,
             "pinch_distance": PINCH_DISTANCE,
             "key_release_timeout": KEY_RELEASE_TIMEOUT,
+            "exit_key": EXIT_KEY,
+            "exit_key_name": EXIT_KEY_NAME,
+            "config_key": CONFIG_KEY,
+            "config_key_name": CONFIG_KEY_NAME,
         }
     }
     for gest in GESTURE_LABELS:
@@ -88,6 +92,12 @@ KEY_RELEASE_TIMEOUT = 500
 
 # Janela da camera sempre por cima
 CAMERA_TOPMOST = True
+
+# Teclas de controle do VisionControl (codigos cv2.waitKey)
+EXIT_KEY = 27       # ESC
+EXIT_KEY_NAME = "ESC"
+CONFIG_KEY = 118    # 'v'
+CONFIG_KEY_NAME = "V"
 
 # =========================================================================
 # CONFIGURACAO PADRAO DOS GESTOS
@@ -241,6 +251,7 @@ def abrir_hub_configuracao():
     right_continuous = {}
     simple_continuous = {}
     active_listener = [None]
+    _ctrl_key_capture = [None]  # (btn, var_code, var_name) p/ capturar teclas de controle
 
     # Variaveis das configuracoes
     var_exibir_camera = tk.BooleanVar(value=EXIBIR_CAMERA)
@@ -250,6 +261,10 @@ def abrir_hub_configuracao():
     var_debounce = tk.IntVar(value=DEBOUNCE_FRAMES)
     var_pinch = tk.DoubleVar(value=PINCH_DISTANCE)
     var_timeout = tk.IntVar(value=KEY_RELEASE_TIMEOUT)
+    var_exit_key = tk.IntVar(value=EXIT_KEY)
+    var_exit_key_name = tk.StringVar(value=EXIT_KEY_NAME)
+    var_config_key = tk.IntVar(value=CONFIG_KEY)
+    var_config_key_name = tk.StringVar(value=CONFIG_KEY_NAME)
 
     # --- HEADER ---
     tk.Label(root, text="VisionControl", font=("Segoe UI", 18, "bold"), fg="#2196F3").pack(pady=(15, 5))
@@ -310,7 +325,50 @@ def abrir_hub_configuracao():
         state[zone_id] = action
         btn.config(text=get_display_name(action), bg="SystemButtonFace")
 
+    def capturar_ctrl_tecla(btn, var_code, var_name):
+        """Captura a proxima tecla como tecla de controle (sair/config)."""
+        if _ctrl_key_capture[0]:
+            old_btn, _, _ = _ctrl_key_capture[0]
+            old_btn.config(text=old_btn.old_text, bg="SystemButtonFace")
+        _ctrl_key_capture[0] = (btn, var_code, var_name)
+        btn.old_text = btn.cget("text")
+        btn.config(text="...", bg="#FFF9C4")
+
     def on_key_press(event):
+        # Verifica captura de tecla de controle primeiro
+        if _ctrl_key_capture[0]:
+            btn, var_code, var_name = _ctrl_key_capture[0]
+            keysym = event.keysym
+            code, name = None, None
+
+            if keysym == "Escape":
+                code, name = 27, "ESC"
+            elif keysym == "Space":
+                code, name = 32, "SPACE"
+            elif keysym == "Return":
+                code, name = 13, "ENTER"
+            elif keysym == "Tab":
+                code, name = 9, "TAB"
+            elif keysym.startswith("F") and len(keysym) <= 3:
+                try:
+                    n = int(keysym[1:])
+                    if 1 <= n <= 12:
+                        code, name = 111 + n, keysym.upper()
+                except ValueError:
+                    pass
+            elif len(event.char) == 1 and event.char.isprintable():
+                code = ord(event.char.lower())
+                name = event.char.upper()
+
+            if code is not None:
+                var_code.set(code)
+                var_name.set(name)
+                btn.config(text=name, bg="SystemButtonFace")
+            else:
+                btn.config(text=var_name.get(), bg="SystemButtonFace")
+            _ctrl_key_capture[0] = None
+            return
+
         if not active_listener[0]:
             return
 
@@ -459,6 +517,10 @@ def abrir_hub_configuracao():
         var_debounce.set(cfg.get("debounce_frames", DEBOUNCE_FRAMES))
         var_pinch.set(cfg.get("pinch_distance", PINCH_DISTANCE))
         var_timeout.set(cfg.get("key_release_timeout", KEY_RELEASE_TIMEOUT))
+        var_exit_key.set(cfg.get("exit_key", EXIT_KEY))
+        var_exit_key_name.set(cfg.get("exit_key_name", EXIT_KEY_NAME))
+        var_config_key.set(cfg.get("config_key", CONFIG_KEY))
+        var_config_key_name.set(cfg.get("config_key_name", CONFIG_KEY_NAME))
         if "modo_simples_ativado" in saved_config:
             config["modo_simples_ativado"] = saved_config["modo_simples_ativado"]
 
@@ -532,13 +594,39 @@ def abrir_hub_configuracao():
                    variable=var_modo_simples,
                    font=("Segoe UI", 9)).grid(row=7, column=1, pady=8, sticky="w", padx=10)
 
+    # Tecla Sair
+    tk.Label(config_frame, text="Tecla Sair:", font=("Segoe UI", 10, "bold"), anchor="w").grid(
+        row=8, column=0, pady=8, sticky="w"
+    )
+    btn_sair = tk.Button(
+        config_frame, text=EXIT_KEY_NAME, width=10,
+        font=("Segoe UI", 9), cursor="hand2"
+    )
+    btn_sair.grid(row=8, column=1, pady=8, sticky="w", padx=10)
+    btn_sair.config(command=lambda: capturar_ctrl_tecla(btn_sair, var_exit_key, var_exit_key_name))
+
+    # Tecla Config
+    tk.Label(config_frame, text="Tecla Config:", font=("Segoe UI", 10, "bold"), anchor="w").grid(
+        row=9, column=0, pady=8, sticky="w"
+    )
+    btn_config = tk.Button(
+        config_frame, text=CONFIG_KEY_NAME, width=10,
+        font=("Segoe UI", 9), cursor="hand2"
+    )
+    btn_config.grid(row=9, column=1, pady=8, sticky="w", padx=10)
+    btn_config.config(command=lambda: capturar_ctrl_tecla(btn_config, var_config_key, var_config_key_name))
+
+    # Atualiza texto dos botoes com valores carregados
+    btn_sair.config(text=var_exit_key_name.get())
+    btn_config.config(text=var_config_key_name.get())
+
     # Info
     tk.Label(
         config_frame,
         text="\nDica: Se o controle estiver 'travando', aumente o Debounce.\n"
              "Se as pincas nao funcionarem bem, ajuste a Distancia da Pinca.",
         font=("Segoe UI", 9), fg="#666666", justify=tk.LEFT
-    ).grid(row=8, column=0, columnspan=3, pady=15, sticky="w")
+    ).grid(row=10, column=0, columnspan=3, pady=15, sticky="w")
 
     # --- BOTOES INFERIORES ---
     button_frame = tk.Frame(root)
@@ -572,6 +660,10 @@ def abrir_hub_configuracao():
             "debounce_frames": var_debounce.get(),
             "pinch_distance": var_pinch.get(),
             "key_release_timeout": var_timeout.get(),
+            "exit_key": var_exit_key.get(),
+            "exit_key_name": var_exit_key_name.get(),
+            "config_key": var_config_key.get(),
+            "config_key_name": var_config_key_name.get(),
         }
 
         salvar_config(config)
@@ -614,6 +706,10 @@ def abrir_hub_configuracao():
             "debounce_frames": var_debounce.get(),
             "pinch_distance": var_pinch.get(),
             "key_release_timeout": var_timeout.get(),
+            "exit_key": var_exit_key.get(),
+            "exit_key_name": var_exit_key_name.get(),
+            "config_key": var_config_key.get(),
+            "config_key_name": var_config_key_name.get(),
         }
         texto = json.dumps(cfg, indent=2, ensure_ascii=False)
         root.clipboard_clear()
