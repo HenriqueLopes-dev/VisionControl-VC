@@ -12,6 +12,13 @@ from config import (
 from gestos import detectar_gesto
 from controles import InputController
 
+# Resolucao interna reduzida para processamento mais rapido
+PROC_W = 320
+PROC_H = 240
+
+# WND_PROP_TOPMOST pode nao existir em builds antigas do OpenCV
+_WND_PROP_TOPMOST = getattr(cv2, 'WND_PROP_TOPMOST', 5)
+
 
 class VisionControlApp:
     """Aplicacao principal com processamento otimizado."""
@@ -112,8 +119,6 @@ class VisionControlApp:
         if self.exibir_camera:
             cv2.namedWindow("VisionControl", cv2.WINDOW_NORMAL)
             cv2.resizeWindow("VisionControl", 480, 360)
-            if self.camera_topmost:
-                cv2.setWindowProperty("VisionControl", cv2.WND_PROP_TOPMOST, 1)
 
         try:
             if not self.cap.isOpened():
@@ -153,6 +158,8 @@ class VisionControlApp:
             if self.exibir_camera:
                 self._draw_hud(frame, frame_w, frame_h)
                 cv2.imshow("VisionControl", frame)
+                if self.camera_topmost:
+                    cv2.setWindowProperty("VisionControl", _WND_PROP_TOPMOST, 1)
                 if cv2.waitKey(1) & 0xFF == 27:
                     self.running = False
                     break
@@ -160,7 +167,9 @@ class VisionControlApp:
                 cv2.waitKey(1)
 
     def _process_frame(self, frame, frame_w, frame_h):
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Reduz frame para processamento mais rapido
+        small = cv2.resize(frame, (PROC_W, PROC_H))
+        rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb)
 
         self.last_hand_landmarks = []
@@ -278,38 +287,41 @@ class VisionControlApp:
         overlay = frame.copy()
         cv2.rectangle(overlay, (0, 0), (frame_w, 85), (0, 0, 0), -1)
         cv2.rectangle(overlay, (0, frame_h - 30), (frame_w, frame_h), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
 
-        # Linha divisoria
+        # Linha divisoria branca
         mid_x = frame_w // 2
-        cv2.line(frame, (mid_x, 0), (mid_x, 85), (80, 80, 80), 1)
+        cv2.line(frame, (mid_x, 0), (mid_x, 85), (255, 255, 255), 2)
 
-        # Painel esquerdo
+        white = (255, 255, 255)
+
+        # Cabeçalhos
         cv2.putText(frame, "MAO ESQUERDA", (10, 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
-        cv2.putText(frame, f"Gesto: {self.hud_left_gesto}", (10, 45),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
-        cv2.putText(frame, f"Acao: {self.hud_left_acao}", (10, 68),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
-
-        # Painel direito
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, white, 2)
         cv2.putText(frame, "MAO DIREITA", (mid_x + 10, 22),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 128, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, white, 2)
+
+        # Info esquerda
+        cv2.putText(frame, f"Gesto: {self.hud_left_gesto}", (10, 45),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, white, 1)
+        cv2.putText(frame, f"Acao: {self.hud_left_acao}", (10, 68),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, white, 1)
+
+        # Info direita
         cv2.putText(frame, f"Gesto: {self.hud_right_gesto}", (mid_x + 10, 45),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 128, 0), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, white, 1)
         cv2.putText(frame, f"Acao: {self.hud_right_acao}", (mid_x + 10, 68),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 128, 0), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, white, 1)
 
         # Barra inferior
         cv2.putText(frame, f"FPS: {self.fps}", (10, frame_h - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, white, 1)
         cv2.putText(frame, "ESC para sair", (frame_w - 110, frame_h - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (150, 150, 150), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
 
     def _draw_simple_zones(self, frame, frame_w, frame_h):
-        """Desenha as 4 zonas do Modo Simples na tela."""
-        active_color = (0, 255, 0)
-        inactive_color = (50, 50, 50)
+        """Desenha as 4 zonas do Modo Simples na tela com 1 overlay unico."""
+        overlay = frame.copy()
 
         for zone_id in SIMPLE_ZONE_LABELS:
             z = self.SIMPLE_ZONES[zone_id]
@@ -319,11 +331,9 @@ class VisionControlApp:
             y2 = int(z["y_max"] * frame_h)
 
             is_active = self.simple_zone_hover.get(zone_id, False)
-            color = active_color if is_active else inactive_color
+            color = (0, 255, 0) if is_active else (50, 50, 50)
 
-            overlay = frame.copy()
             cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-            cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
             cfg = self.config_simples.get(zone_id, {})
@@ -337,12 +347,15 @@ class VisionControlApp:
             cv2.putText(frame, label, (tx, ty),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
+        cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+
+        white = (255, 255, 255)
         cv2.putText(frame, "MODO SIMPLES", (10, 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         cv2.putText(frame, f"FPS: {self.fps}", (10, frame_h - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, white, 1)
         cv2.putText(frame, "ESC para sair", (frame_w - 110, frame_h - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (150, 150, 150), 1)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
 
     def shutdown(self):
         print("Desligando...")

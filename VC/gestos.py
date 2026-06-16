@@ -37,28 +37,18 @@ def distance_sq(point_a, point_b):
     return dx * dx + dy * dy
 
 
-def get_open_fingers(landmarks):
-    """Verifica quais dedos (exceto polegar) estao abertos."""
-    return {
-        "indicador": landmarks[IDX_PONTA_INDICADOR].y < landmarks[IDX_JUNTA_INDICADOR].y,
-        "medio": landmarks[IDX_PONTA_MEDIO].y < landmarks[IDX_JUNTA_MEDIO].y,
-        "anelar": landmarks[IDX_PONTA_ANELAR].y < landmarks[IDX_JUNTA_ANELAR].y,
-        "minimo": landmarks[IDX_PONTA_MINIMO].y < landmarks[IDX_JUNTA_MINIMO].y,
-    }
-
-
 def detectar_gesto(landmarks):
     """
     Detecta o gesto baseado nos landmarks da mao.
     Usa PINCH_DISTANCE do modulo (pode ser sobrescrito).
     """
-    fingers = get_open_fingers(landmarks)
-    indicador = fingers["indicador"]
-    medio = fingers["medio"]
-    anelar = fingers["anelar"]
-    minimo = fingers["minimo"]
+    # Verifica dedos abertos (inline, sem criar dict)
+    indicador = landmarks[IDX_PONTA_INDICADOR].y < landmarks[IDX_JUNTA_INDICADOR].y
+    medio = landmarks[IDX_PONTA_MEDIO].y < landmarks[IDX_JUNTA_MEDIO].y
+    anelar = landmarks[IDX_PONTA_ANELAR].y < landmarks[IDX_JUNTA_ANELAR].y
+    minimo = landmarks[IDX_PONTA_MINIMO].y < landmarks[IDX_JUNTA_MINIMO].y
 
-    finger_count = indicador + medio + anelar + minimo
+    finger_count = (1 if indicador else 0) + (1 if medio else 0) + (1 if anelar else 0) + (1 if minimo else 0)
 
     # Punho fechado = neutro
     if finger_count == 0:

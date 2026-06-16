@@ -70,19 +70,19 @@
   "simples": {
     "S_CIMA": {
       "acao": "w",
-      "continuo": true
+      "continuo": false
     },
     "S_BAIXO": {
       "acao": "s",
-      "continuo": true
+      "continuo": false
     },
     "S_ESQUERDA": {
       "acao": "a",
-      "continuo": true
+      "continuo": false
     },
     "S_DIREITA": {
       "acao": "d",
-      "continuo": true
+      "continuo": false
     }
   },
   "modo_simples_ativado": true,
@@ -92,7 +92,7 @@
     "camera_topmost": true,
     "camera_id": 0,
     "smooth_factor": 0.35,
-    "debounce_frames": 3,
+    "debounce_frames": 1,
     "pinch_distance": 0.04,
     "key_release_timeout": 500
   }
