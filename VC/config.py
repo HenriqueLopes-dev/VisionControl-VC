@@ -270,6 +270,7 @@ def abrir_hub_configuracao():
     var_exit_key_name = tk.StringVar(value=EXIT_KEY_NAME)
     var_config_key = tk.IntVar(value=CONFIG_KEY)
     var_config_key_name = tk.StringVar(value=CONFIG_KEY_NAME)
+    var_modo_simples = tk.BooleanVar(value=False)
 
     # --- HEADER ---
     tk.Label(root, text="VisionControl", font=("Segoe UI", 18, "bold"), fg="#2196F3").pack(pady=(15, 5))
@@ -492,42 +493,98 @@ def abrir_hub_configuracao():
     simple_frame.pack(pady=10, expand=True)
     simple_buttons = criar_tabela(simple_frame, "simples", simple_state, simple_continuous, SIMPLE_ZONE_LABELS)
 
-    # Carrega config salva e preenche a UI
-    saved_config = carregar_config()
-    if saved_config:
+    # === FUNCOES AUXILIARES (coletar/carregar estado da UI) ===
+    def _coletar_config_ui():
+        cfg = {
+            "left": {},
+            "right": {},
+            "simples": {},
+            "modo_simples_ativado": var_modo_simples.get(),
+            "settings": {
+                "exibir_camera": var_exibir_camera.get(),
+                "camera_topmost": var_camera_topmost.get(),
+                "camera_id": var_camera_id.get(),
+                "smooth_factor": var_smooth.get(),
+                "debounce_frames": var_debounce.get(),
+                "pinch_distance": var_pinch.get(),
+                "key_release_timeout": var_timeout.get(),
+                "exit_key": var_exit_key.get(),
+                "exit_key_name": var_exit_key_name.get(),
+                "config_key": var_config_key.get(),
+                "config_key_name": var_config_key_name.get(),
+            }
+        }
         for gest in GESTURE_LABELS:
-            if gest in saved_config.get("left", {}):
-                acao = saved_config["left"][gest].get("acao")
-                left_state[gest] = acao
-                left_continuous[gest].set(saved_config["left"][gest].get("continuo", False))
-                left_buttons[gest].config(text=get_display_name(acao))
-            if gest in saved_config.get("right", {}):
-                acao = saved_config["right"][gest].get("acao")
-                right_state[gest] = acao
-                right_continuous[gest].set(saved_config["right"][gest].get("continuo", False))
-                right_buttons[gest].config(text=get_display_name(acao))
-
+            cfg["left"][gest] = {
+                "acao": normalize_key(left_state.get(gest)),
+                "continuo": left_continuous[gest].get()
+            }
+            cfg["right"][gest] = {
+                "acao": normalize_key(right_state.get(gest)),
+                "continuo": right_continuous[gest].get()
+            }
         for zone_id in SIMPLE_ZONE_LABELS:
-            if zone_id in saved_config.get("simples", {}):
-                acao = saved_config["simples"][zone_id].get("acao")
-                simple_state[zone_id] = acao
-                simple_continuous[zone_id].set(saved_config["simples"][zone_id].get("continuo", False))
-                simple_buttons[zone_id].config(text=get_display_name(acao))
+            cfg["simples"][zone_id] = {
+                "acao": normalize_key(simple_state.get(zone_id)),
+                "continuo": simple_continuous[zone_id].get()
+            }
+        return cfg
 
-        cfg = saved_config.get("settings", {})
-        var_exibir_camera.set(cfg.get("exibir_camera", EXIBIR_CAMERA))
-        var_camera_topmost.set(cfg.get("camera_topmost", CAMERA_TOPMOST))
-        var_camera_id.set(cfg.get("camera_id", CAMERA_ID))
-        var_smooth.set(cfg.get("smooth_factor", SMOOTH_FACTOR))
-        var_debounce.set(cfg.get("debounce_frames", DEBOUNCE_FRAMES))
-        var_pinch.set(cfg.get("pinch_distance", PINCH_DISTANCE))
-        var_timeout.set(cfg.get("key_release_timeout", KEY_RELEASE_TIMEOUT))
-        var_exit_key.set(cfg.get("exit_key", EXIT_KEY))
-        var_exit_key_name.set(cfg.get("exit_key_name", EXIT_KEY_NAME))
-        var_config_key.set(cfg.get("config_key", CONFIG_KEY))
-        var_config_key_name.set(cfg.get("config_key_name", CONFIG_KEY_NAME))
-        if "modo_simples_ativado" in saved_config:
-            config["modo_simples_ativado"] = saved_config["modo_simples_ativado"]
+    def _carregar_config_ui(dados):
+        for gest in GESTURE_LABELS:
+            if gest in dados.get("left", {}):
+                acao = dados["left"][gest].get("acao")
+                left_state[gest] = acao
+                left_continuous[gest].set(dados["left"][gest].get("continuo", False))
+                left_buttons[gest].config(text=get_display_name(acao))
+            if gest in dados.get("right", {}):
+                acao = dados["right"][gest].get("acao")
+                right_state[gest] = acao
+                right_continuous[gest].set(dados["right"][gest].get("continuo", False))
+                right_buttons[gest].config(text=get_display_name(acao))
+        for zone_id in SIMPLE_ZONE_LABELS:
+            if zone_id in dados.get("simples", {}):
+                acao = dados["simples"][zone_id].get("acao")
+                simple_state[zone_id] = acao
+                simple_continuous[zone_id].set(dados["simples"][zone_id].get("continuo", False))
+                simple_buttons[zone_id].config(text=get_display_name(acao))
+        s = dados.get("settings", {})
+        var_exibir_camera.set(s.get("exibir_camera", EXIBIR_CAMERA))
+        var_camera_topmost.set(s.get("camera_topmost", CAMERA_TOPMOST))
+        var_camera_id.set(s.get("camera_id", CAMERA_ID))
+        var_smooth.set(s.get("smooth_factor", SMOOTH_FACTOR))
+        var_debounce.set(s.get("debounce_frames", DEBOUNCE_FRAMES))
+        var_pinch.set(s.get("pinch_distance", PINCH_DISTANCE))
+        var_timeout.set(s.get("key_release_timeout", KEY_RELEASE_TIMEOUT))
+        var_exit_key.set(s.get("exit_key", EXIT_KEY))
+        var_exit_key_name.set(s.get("exit_key_name", EXIT_KEY_NAME))
+        var_config_key.set(s.get("config_key", CONFIG_KEY))
+        var_config_key_name.set(s.get("config_key_name", CONFIG_KEY_NAME))
+        var_modo_simples.set(dados.get("modo_simples_ativado", False))
+
+    # Carrega config e gerencia presets
+    saved_config = carregar_config()
+    presets = {}
+    preset_ativo = "Default"
+
+    if saved_config:
+        if "presets" not in saved_config:
+            default_preset = {"left": {}, "right": {}, "simples": {}, "modo_simples_ativado": False, "settings": saved_config.get("settings", {})}
+            for gest in GESTURE_LABELS:
+                default_preset["left"][gest] = saved_config.get("left", {}).get(gest, {"acao": DEFAULT_LEFT_HAND.get(gest), "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]})
+                default_preset["right"][gest] = saved_config.get("right", {}).get(gest, {"acao": DEFAULT_RIGHT_HAND.get(gest), "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]})
+            for zone_id in SIMPLE_ZONE_LABELS:
+                default_preset["simples"][zone_id] = saved_config.get("simples", {}).get(zone_id, {"acao": DEFAULT_SIMPLE_MODE[zone_id]["acao"], "continuo": DEFAULT_SIMPLE_MODE[zone_id]["continuo"]})
+            default_preset["modo_simples_ativado"] = saved_config.get("modo_simples_ativado", False)
+            presets = {"Default": default_preset}
+            preset_ativo = "Default"
+        else:
+            presets = saved_config["presets"]
+            preset_ativo = saved_config.get("preset_ativo", "Default")
+            if preset_ativo not in presets:
+                preset_ativo = "Default"
+
+        _carregar_config_ui(presets[preset_ativo])
 
     # --- ABA CONFIGURACOES (com scroll) ---
     config_canvas = tk.Canvas(aba_config, borderwidth=0, highlightthickness=0)
@@ -606,7 +663,6 @@ def abrir_hub_configuracao():
     tk.Label(config_frame, text="Modo:", font=("Segoe UI", 10, "bold"), anchor="w").grid(
         row=7, column=0, pady=8, sticky="w"
     )
-    var_modo_simples = tk.BooleanVar(value=config.get("modo_simples_ativado", False))
     tk.Checkbutton(config_frame, text="Ativar Modo Simples (desativa gestos e mouse)",
                    variable=var_modo_simples,
                    font=("Segoe UI", 9)).grid(row=7, column=1, pady=8, sticky="w", padx=10)
@@ -649,40 +705,144 @@ def abrir_hub_configuracao():
     button_frame = tk.Frame(root)
     button_frame.pack(side=tk.BOTTOM, pady=15)
 
+    # --- ABA PRESETS ---
+    aba_presets = ttk.Frame(notebook)
+    notebook.insert("end", aba_presets, text=" Presets ")
+
+    preset_canvas = tk.Canvas(aba_presets, borderwidth=0, highlightthickness=0)
+    preset_scrollbar = tk.Scrollbar(aba_presets, orient="vertical", command=preset_canvas.yview)
+    preset_canvas.configure(yscrollcommand=preset_scrollbar.set)
+    preset_canvas.pack(side="left", fill="both", expand=True)
+    preset_scrollbar.pack(side="right", fill="y")
+
+    preset_inner = tk.Frame(preset_canvas, padx=15, pady=15)
+    preset_inner.bind("<Configure>", lambda e: preset_canvas.configure(scrollregion=preset_canvas.bbox("all")))
+    preset_canvas.create_window((0, 0), window=preset_inner, anchor="nw")
+
+    def _on_preset_mousewheel(event):
+        preset_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    preset_canvas.bind_all("<MouseWheel>", _on_preset_mousewheel)
+    preset_canvas.bind("<Destroy>", lambda e: preset_canvas.unbind_all("<MouseWheel>"))
+
+    _preset_card_refs = []
+
+    def _atualizar_grid_presets():
+        for w in preset_inner.winfo_children():
+            w.destroy()
+        _preset_card_refs.clear()
+        nomes = list(presets.keys())
+        cols = 4
+        for i, nome in enumerate(nomes):
+            row = i // cols
+            col = i % cols
+            is_active = (nome == preset_ativo)
+            card = tk.Frame(preset_inner, width=150, height=100, relief="raised", borderwidth=2)
+            card.grid(row=row, column=col, padx=8, pady=8)
+            card.grid_propagate(False)
+            card.configure(bg="#BBDEFB" if is_active else "#F5F5F5")
+
+            lbl = tk.Label(card, text=nome, font=("Segoe UI", 10, "bold"),
+                          bg=card.cget("bg"), wraplength=130)
+            lbl.pack(expand=True)
+
+            card.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
+            lbl.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
+
+            if nome != "Default":
+                btn_del = tk.Button(card, text="X", font=("Segoe UI", 7, "bold"),
+                                   fg="red", bd=0, cursor="hand2",
+                                   command=lambda n=nome: _apagar_preset(n))
+                btn_del.place(x=130, y=2)
+
+            _preset_card_refs.append(card)
+
+        row = len(nomes) // cols
+        col = len(nomes) % cols
+        card_plus = tk.Frame(preset_inner, width=150, height=100, relief="raised", borderwidth=2)
+        card_plus.grid(row=row, column=col, padx=8, pady=8)
+        card_plus.grid_propagate(False)
+
+        lbl_plus = tk.Label(card_plus, text="+", font=("Segoe UI", 28), fg="#4CAF50",
+                           bg="#F5F5F5", cursor="hand2")
+        lbl_plus.pack(expand=True)
+
+        card_plus.bind("<Button-1>", lambda e: _criar_preset())
+        lbl_plus.bind("<Button-1>", lambda e: _criar_preset())
+        _preset_card_refs.append(card_plus)
+
+    def _load_preset(nome):
+        nonlocal preset_ativo
+        if nome in presets:
+            preset_ativo = nome
+            _carregar_config_ui(presets[nome])
+            _atualizar_grid_presets()
+
+    def _criar_preset():
+        nonlocal preset_ativo
+        dialogo = tk.Toplevel(root)
+        dialogo.title("Novo Preset")
+        dialogo.geometry("350x150")
+        dialogo.resizable(False, False)
+        dialogo.transient(root)
+        dialogo.grab_set()
+
+        cx = root.winfo_x() + (root.winfo_width() // 2) - 175
+        cy = root.winfo_y() + (root.winfo_height() // 2) - 75
+        dialogo.geometry(f"+{cx}+{cy}")
+
+        tk.Label(dialogo, text="Nome do preset:", font=("Segoe UI", 10)).pack(pady=(20, 5))
+        entrada = tk.Entry(dialogo, font=("Segoe UI", 10), width=30)
+        entrada.pack(pady=5)
+        entrada.focus_set()
+
+        def confirmar():
+            nome = entrada.get().strip()
+            if not nome:
+                return
+            if nome in presets:
+                tk.messagebox.showwarning("Aviso", "Ja existe um preset com esse nome.", parent=dialogo)
+                return
+            presets[nome] = _coletar_config_ui()
+            preset_ativo = nome
+            _carregar_config_ui(presets[nome])
+            _atualizar_grid_presets()
+            dialogo.destroy()
+
+        def cancelar():
+            dialogo.destroy()
+
+        btn_frame = tk.Frame(dialogo)
+        btn_frame.pack(pady=10)
+        tk.Button(btn_frame, text="Criar", command=confirmar, width=10,
+                 font=("Segoe UI", 9), bg="#4CAF50", fg="white", cursor="hand2").pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Cancelar", command=cancelar, width=10,
+                 font=("Segoe UI", 9), cursor="hand2").pack(side="left", padx=5)
+
+        entrada.bind("<Return>", lambda e: confirmar())
+        entrada.bind("<Escape>", lambda e: cancelar())
+
+    def _apagar_preset(nome):
+        nonlocal preset_ativo
+        if nome == "Default":
+            return
+        if nome == preset_ativo:
+            preset_ativo = "Default"
+            _carregar_config_ui(presets["Default"])
+        del presets[nome]
+        _atualizar_grid_presets()
+
+    _atualizar_grid_presets()
+
     def iniciar():
-        for gest in GESTURE_LABELS:
-            config["left"][gest] = {
-                "acao": normalize_key(left_state.get(gest)),
-                "continuo": left_continuous[gest].get()
-            }
-            config["right"][gest] = {
-                "acao": normalize_key(right_state.get(gest)),
-                "continuo": right_continuous[gest].get()
-            }
-
-        config["simples"] = {}
-        for zone_id in SIMPLE_ZONE_LABELS:
-            config["simples"][zone_id] = {
-                "acao": normalize_key(simple_state.get(zone_id)),
-                "continuo": simple_continuous[zone_id].get()
-            }
-        config["modo_simples_ativado"] = var_modo_simples.get()
-
-        # Salva configuracoes
-        config["settings"] = {
-            "exibir_camera": var_exibir_camera.get(),
-            "camera_topmost": var_camera_topmost.get(),
-            "camera_id": var_camera_id.get(),
-            "smooth_factor": var_smooth.get(),
-            "debounce_frames": var_debounce.get(),
-            "pinch_distance": var_pinch.get(),
-            "key_release_timeout": var_timeout.get(),
-            "exit_key": var_exit_key.get(),
-            "exit_key_name": var_exit_key_name.get(),
-            "config_key": var_config_key.get(),
-            "config_key_name": var_config_key_name.get(),
-        }
-
+        presets[preset_ativo] = _coletar_config_ui()
+        config["presets"] = presets
+        config["preset_ativo"] = preset_ativo
+        p = presets[preset_ativo]
+        config["left"] = p["left"]
+        config["right"] = p["right"]
+        config["simples"] = p["simples"]
+        config["modo_simples_ativado"] = p["modo_simples_ativado"]
+        config["settings"] = p["settings"]
         salvar_config(config)
         config["start"] = True
         root.destroy()
