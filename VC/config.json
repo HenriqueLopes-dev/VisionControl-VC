@@ -14,7 +14,7 @@
     },
     "4_DEDOS": {
       "acao": "s",
-      "continuo": false
+      "continuo": true
     },
     "PINCA_INDICADOR": {
       "acao": "space",
@@ -86,7 +86,6 @@
     }
   },
   "modo_simples_ativado": true,
-  "start": false,
   "settings": {
     "exibir_camera": true,
     "camera_topmost": true,

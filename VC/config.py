@@ -226,15 +226,20 @@ def abrir_hub_configuracao():
 
     root = tk.Tk()
     root.title("VisionControl - Configuracao")
-    root.geometry("840x760")
-    root.resizable(True, True)
-    root.minsize(840, 600)
 
-    # Garante que a janela aparece no centro da tela
+    win_w, win_h = 840, 760
+    screen_h = root.winfo_screenheight()
+    if win_h > screen_h - 60:
+        win_h = screen_h - 60
+    root.geometry(f"{win_w}x{win_h}")
+    root.resizable(True, True)
+    root.minsize(win_w, 600)
+
+    # Centraliza a janela na tela
     root.update_idletasks()
-    x = (root.winfo_screenwidth() // 2) - (840 // 2)
-    y = (root.winfo_screenheight() // 2) - (760 // 2)
-    root.geometry(f"840x760+{x}+{y}")
+    x = (root.winfo_screenwidth() // 2) - (win_w // 2)
+    y = (root.winfo_screenheight() // 2) - (win_h // 2)
+    root.geometry(f"{win_w}x{win_h}+{x}+{y}")
 
     config = {
         "left": {},
@@ -524,9 +529,21 @@ def abrir_hub_configuracao():
         if "modo_simples_ativado" in saved_config:
             config["modo_simples_ativado"] = saved_config["modo_simples_ativado"]
 
-    # --- ABA CONFIGURACOES ---
-    config_frame = tk.Frame(aba_config, padx=20, pady=20)
-    config_frame.pack(expand=True, fill="both")
+    # --- ABA CONFIGURACOES (com scroll) ---
+    config_canvas = tk.Canvas(aba_config, borderwidth=0, highlightthickness=0)
+    config_scrollbar = tk.Scrollbar(aba_config, orient="vertical", command=config_canvas.yview)
+    config_canvas.configure(yscrollcommand=config_scrollbar.set)
+    config_canvas.pack(side="left", fill="both", expand=True)
+    config_scrollbar.pack(side="right", fill="y")
+
+    config_frame = tk.Frame(config_canvas, padx=20, pady=20)
+    config_frame.bind("<Configure>", lambda e: config_canvas.configure(scrollregion=config_canvas.bbox("all")))
+    config_canvas.create_window((0, 0), window=config_frame, anchor="nw")
+
+    def _on_mousewheel(event):
+        config_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    config_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    config_canvas.bind("<Destroy>", lambda e: config_canvas.unbind_all("<MouseWheel>"))
 
     def criar_slider(parent, texto, var, minval, maxval, resolucao, row, unit=""):
         tk.Label(parent, text=texto, font=("Segoe UI", 10, "bold"), anchor="w").grid(
@@ -630,7 +647,7 @@ def abrir_hub_configuracao():
 
     # --- BOTOES INFERIORES ---
     button_frame = tk.Frame(root)
-    button_frame.pack(pady=15)
+    button_frame.pack(side=tk.BOTTOM, pady=15)
 
     def iniciar():
         for gest in GESTURE_LABELS:
