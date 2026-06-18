@@ -45,6 +45,8 @@ python -m nuitka --standalone ^
     --lto=yes ^
     --jobs=%NUMBER_OF_PROCESSORS% ^
     --include-data-file=config.json=config.json ^
+    --include-data-dir=..\.venv\Lib\site-packages\mediapipe\modules=mediapipe/modules ^
+    --output-filename=VisionControl.exe ^
     --output-dir=dist ^
     main.py
 
@@ -59,7 +61,7 @@ echo.
 echo [3/3] Build concluido com sucesso!
 echo.
 echo ========================================
-echo  Executavel: dist\main.dist\main.exe
+echo  Executavel: dist\main.dist\VisionControl.exe
 echo  Pasta completa: dist\main.dist\
 echo.
 echo  Para distribuir, copie a pasta inteira.
