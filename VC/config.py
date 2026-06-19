@@ -745,6 +745,20 @@ def abrir_hub_configuracao():
     aba_presets = ttk.Frame(notebook)
     notebook.insert("end", aba_presets, text=" Presets ")
 
+    preset_btn_frame = tk.Frame(aba_presets)
+    preset_btn_frame.pack(side="bottom", fill="x", pady=(0, 8), padx=10)
+
+    btn_excluir_preset = tk.Button(
+        preset_btn_frame,
+        text="Excluir Preset",
+        font=("Segoe UI", 9),
+        bg="#e74c3c",
+        fg="white",
+        cursor="hand2",
+        command=lambda: _apagar_preset(preset_ativo)
+    )
+    btn_excluir_preset.pack(side="left")
+
     preset_canvas = tk.Canvas(aba_presets, borderwidth=0, highlightthickness=0)
     preset_scrollbar = tk.Scrollbar(aba_presets, orient="vertical", command=preset_canvas.yview)
     preset_canvas.configure(yscrollcommand=preset_scrollbar.set)
@@ -765,6 +779,11 @@ def abrir_hub_configuracao():
             _atualizar_grid_presets()
     preset_canvas.bind("<Configure>", _on_preset_resize)
 
+    def _on_notebook_tab_changed(event):
+        if notebook.tab(notebook.select(), "text").strip() == "Presets":
+            _atualizar_grid_presets()
+    notebook.bind("<<NotebookTabChanged>>", _on_notebook_tab_changed)
+
     _preset_card_refs = []
     _recalculando_grid = False
 
@@ -773,58 +792,54 @@ def abrir_hub_configuracao():
         if _recalculando_grid:
             return
         _recalculando_grid = True
-        for w in preset_inner.winfo_children():
-            w.destroy()
-        _preset_card_refs.clear()
-        nomes = list(presets.keys())
+        try:
+            for w in preset_inner.winfo_children():
+                w.destroy()
+            _preset_card_refs.clear()
+            nomes = list(presets.keys())
 
-        card_w = 150
-        spacing = 16
-        avail = preset_canvas.winfo_width()
-        if avail > 1:
-            cols = max(1, (avail - 20) // (card_w + spacing))
-        else:
-            cols = 4
+            card_w = 150
+            spacing = 16
+            avail = preset_canvas.winfo_width()
+            if avail > 1:
+                cols = max(1, (avail - 20) // (card_w + spacing))
+            else:
+                cols = 4
 
-        for i, nome in enumerate(nomes):
-            row = i // cols
-            col = i % cols
-            is_active = (nome == preset_ativo)
-            card = tk.Frame(preset_inner, width=card_w, height=100, relief="raised", borderwidth=2)
-            card.grid(row=row, column=col, padx=8, pady=8)
-            card.grid_propagate(False)
-            card.configure(bg="#BBDEFB" if is_active else "#F5F5F5")
+            for i, nome in enumerate(nomes):
+                row = i // cols
+                col = i % cols
+                is_active = (nome == preset_ativo)
+                card = tk.Frame(preset_inner, width=card_w, height=100, relief="raised", borderwidth=2)
+                card.grid(row=row, column=col, padx=8, pady=8)
+                card.grid_propagate(False)
+                card.configure(bg="#BBDEFB" if is_active else "#F5F5F5")
 
-            lbl = tk.Label(card, text=nome, font=("Segoe UI", 10, "bold"),
-                          bg=card.cget("bg"), wraplength=130)
-            lbl.pack(expand=True)
+                lbl = tk.Label(card, text=nome, font=("Segoe UI", 10, "bold"),
+                              bg=card.cget("bg"), wraplength=130)
+                lbl.pack(expand=True)
 
-            card.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
-            lbl.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
+                card.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
+                lbl.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
 
-            if nome != "Default":
-                btn_del = tk.Button(card, text="X", font=("Segoe UI", 8, "bold"),
-                                   fg="white", bg="#e74c3c", bd=0, cursor="hand2",
-                                   width=2, height=1,
-                                   command=lambda n=nome: _apagar_preset(n))
-                btn_del.place(relx=1.0, rely=0.0, anchor="ne")
+                _preset_card_refs.append(card)
 
-            _preset_card_refs.append(card)
+            row = len(nomes) // cols
+            col = len(nomes) % cols
+            card_plus = tk.Frame(preset_inner, width=card_w, height=100, relief="raised", borderwidth=2)
+            card_plus.grid(row=row, column=col, padx=8, pady=8)
+            card_plus.grid_propagate(False)
 
-        row = len(nomes) // cols
-        col = len(nomes) % cols
-        card_plus = tk.Frame(preset_inner, width=card_w, height=100, relief="raised", borderwidth=2)
-        card_plus.grid(row=row, column=col, padx=8, pady=8)
-        card_plus.grid_propagate(False)
+            lbl_plus = tk.Label(card_plus, text="+", font=("Segoe UI", 28), fg="#4CAF50",
+                               bg="#F5F5F5", cursor="hand2")
+            lbl_plus.pack(expand=True)
 
-        lbl_plus = tk.Label(card_plus, text="+", font=("Segoe UI", 28), fg="#4CAF50",
-                           bg="#F5F5F5", cursor="hand2")
-        lbl_plus.pack(expand=True)
-
-        card_plus.bind("<Button-1>", lambda e: _criar_preset())
-        lbl_plus.bind("<Button-1>", lambda e: _criar_preset())
-        _preset_card_refs.append(card_plus)
-        _recalculando_grid = False
+            card_plus.bind("<Button-1>", lambda e: _criar_preset())
+            lbl_plus.bind("<Button-1>", lambda e: _criar_preset())
+            _preset_card_refs.append(card_plus)
+            btn_excluir_preset.config(state="disabled" if preset_ativo == "Default" else "normal")
+        finally:
+            _recalculando_grid = False
 
     def _load_preset(nome):
         nonlocal preset_ativo
@@ -885,12 +900,12 @@ def abrir_hub_configuracao():
         nonlocal preset_ativo
         if nome == "Default":
             return
-        if nome == preset_ativo:
-            messagebox.showwarning("Aviso", "O preset ativo nao pode ser excluido.", parent=root)
-            return
         if not messagebox.askyesno("Confirmar", f"Excluir o preset '{nome}'?", parent=root):
             return
         del presets[nome]
+        if nome == preset_ativo:
+            preset_ativo = "Default"
+            _carregar_config_ui(presets["Default"])
         _atualizar_grid_presets()
 
     _atualizar_grid_presets()
