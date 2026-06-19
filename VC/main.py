@@ -195,11 +195,13 @@ class VisionControlApp:
                 for hand_landmarks in results.multi_hand_landmarks:
                     landmarks = hand_landmarks.landmark
                     self.last_hand_landmarks.append(hand_landmarks)
-                    cx = sum(lm.x for lm in landmarks) / len(landmarks)
-                    cy = sum(lm.y for lm in landmarks) / len(landmarks)
                     for zone_id, rect in self.SIMPLE_ZONES.items():
-                        if rect["x_min"] <= cx <= rect["x_max"] and rect["y_min"] <= cy <= rect["y_max"]:
-                            zonas[zone_id] = True
+                        if zonas[zone_id]:
+                            continue
+                        for lm in landmarks:
+                            if rect["x_min"] <= lm.x <= rect["x_max"] and rect["y_min"] <= lm.y <= rect["y_max"]:
+                                zonas[zone_id] = True
+                                break
             self.simple_zone_hover = zonas
             self.input_ctrl.tick_modo_simples(self.config_simples, zonas)
             return
