@@ -1,10 +1,12 @@
 # =========================================================================
 # VisionControl - Configuracoes e Hub de Configuracao
 # =========================================================================
+import copy
 import json
 import os
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 
 # Caminho do arquivo de configuracao
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -272,6 +274,14 @@ def abrir_hub_configuracao():
     var_config_key_name = tk.StringVar(value=CONFIG_KEY_NAME)
     var_modo_simples = tk.BooleanVar(value=False)
 
+    _settings_vars = [
+        var_exibir_camera, var_camera_topmost, var_camera_id, var_smooth,
+        var_debounce, var_pinch, var_timeout, var_exit_key, var_exit_key_name,
+        var_config_key, var_config_key_name, var_modo_simples,
+    ]
+    for _v in _settings_vars:
+        _v.trace_add("write", lambda *args: _salvar_preset_ativo())
+
     # --- HEADER ---
     tk.Label(root, text="VisionControl", font=("Segoe UI", 18, "bold"), fg="#2196F3").pack(pady=(15, 5))
     tk.Label(
@@ -330,6 +340,7 @@ def abrir_hub_configuracao():
         state = _resolve_side_state(side)
         state[zone_id] = action
         btn.config(text=get_display_name(action), bg="SystemButtonFace")
+        _salvar_preset_ativo()
 
     def capturar_ctrl_tecla(btn, var_code, var_name):
         """Captura a proxima tecla como tecla de controle (sair/config)."""
@@ -415,6 +426,7 @@ def abrir_hub_configuracao():
 
         btn.config(text=get_display_name(internal_key), bg="SystemButtonFace")
         active_listener[0] = None
+        _salvar_preset_ativo()
 
     root.bind("<Key>", on_key_press)
 
@@ -476,12 +488,19 @@ def abrir_hub_configuracao():
                 parent_frame,
                 text="Segurar",
                 variable=var,
-                font=("Segoe UI", 8)
+                font=("Segoe UI", 8),
+                command=_salvar_preset_ativo
             )
             chk.grid(row=row, column=3, padx=5)
             continuous_dict[zone_id] = var
 
         return buttons
+
+    _carregando = False
+
+    def _salvar_preset_ativo():
+        if presets and preset_ativo in presets and not _carregando:
+            presets[preset_ativo] = _coletar_config_ui()
 
     left_buttons = criar_tabela(left_frame, "left", left_state, left_continuous, GESTURE_LABELS)
     right_buttons = criar_tabela(right_frame, "right", right_state, right_continuous, GESTURE_LABELS)
@@ -531,6 +550,8 @@ def abrir_hub_configuracao():
         return cfg
 
     def _carregar_config_ui(dados):
+        if not isinstance(dados, dict):
+            dados = criar_config_padrao()
         for gest in GESTURE_LABELS:
             if gest in dados.get("left", {}):
                 acao = dados["left"][gest].get("acao")
@@ -567,24 +588,39 @@ def abrir_hub_configuracao():
     presets = {}
     preset_ativo = "Default"
 
-    if saved_config:
-        if "presets" not in saved_config:
-            default_preset = {"left": {}, "right": {}, "simples": {}, "modo_simples_ativado": False, "settings": saved_config.get("settings", {})}
-            for gest in GESTURE_LABELS:
-                default_preset["left"][gest] = saved_config.get("left", {}).get(gest, {"acao": DEFAULT_LEFT_HAND.get(gest), "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]})
-                default_preset["right"][gest] = saved_config.get("right", {}).get(gest, {"acao": DEFAULT_RIGHT_HAND.get(gest), "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]})
-            for zone_id in SIMPLE_ZONE_LABELS:
-                default_preset["simples"][zone_id] = saved_config.get("simples", {}).get(zone_id, {"acao": DEFAULT_SIMPLE_MODE[zone_id]["acao"], "continuo": DEFAULT_SIMPLE_MODE[zone_id]["continuo"]})
-            default_preset["modo_simples_ativado"] = saved_config.get("modo_simples_ativado", False)
-            presets = {"Default": default_preset}
-            preset_ativo = "Default"
-        else:
-            presets = saved_config["presets"]
-            preset_ativo = saved_config.get("preset_ativo", "Default")
-            if preset_ativo not in presets:
-                preset_ativo = "Default"
+    def _garantir_default():
+        if "Default" not in presets:
+            cfg_padrao = criar_config_padrao()
+            presets["Default"] = cfg_padrao
 
-        _carregar_config_ui(presets[preset_ativo])
+    if saved_config is None:
+        cfg_padrao = criar_config_padrao()
+        salvar_config(cfg_padrao)
+        presets = {"Default": cfg_padrao}
+        preset_ativo = "Default"
+    elif "presets" not in saved_config or not isinstance(saved_config.get("presets"), dict):
+        default_preset = {"left": {}, "right": {}, "simples": {}, "modo_simples_ativado": False, "settings": saved_config.get("settings", {})}
+        for gest in GESTURE_LABELS:
+            default_preset["left"][gest] = saved_config.get("left", {}).get(gest, {"acao": DEFAULT_LEFT_HAND.get(gest), "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]})
+            default_preset["right"][gest] = saved_config.get("right", {}).get(gest, {"acao": DEFAULT_RIGHT_HAND.get(gest), "continuo": gest in ["1_DEDO", "2_DEDOS", "3_DEDOS", "4_DEDOS"]})
+        for zone_id in SIMPLE_ZONE_LABELS:
+            default_preset["simples"][zone_id] = saved_config.get("simples", {}).get(zone_id, {"acao": DEFAULT_SIMPLE_MODE[zone_id]["acao"], "continuo": DEFAULT_SIMPLE_MODE[zone_id]["continuo"]})
+        default_preset["modo_simples_ativado"] = saved_config.get("modo_simples_ativado", False)
+        presets = {"Default": default_preset}
+        preset_ativo = "Default"
+    else:
+        presets = saved_config["presets"]
+        preset_ativo = saved_config.get("preset_ativo", "Default")
+        if preset_ativo not in presets:
+            preset_ativo = "Default"
+
+    _garantir_default()
+    if preset_ativo not in presets:
+        preset_ativo = "Default"
+
+    _carregando = True
+    _carregar_config_ui(presets[preset_ativo])
+    _carregando = False
 
     # --- ABA CONFIGURACOES (com scroll) ---
     config_canvas = tk.Canvas(aba_config, borderwidth=0, highlightthickness=0)
@@ -724,19 +760,37 @@ def abrir_hub_configuracao():
     preset_canvas.bind_all("<MouseWheel>", _on_preset_mousewheel)
     preset_canvas.bind("<Destroy>", lambda e: preset_canvas.unbind_all("<MouseWheel>"))
 
+    def _on_preset_resize(event):
+        if event.width > 1:
+            _atualizar_grid_presets()
+    preset_canvas.bind("<Configure>", _on_preset_resize)
+
     _preset_card_refs = []
+    _recalculando_grid = False
 
     def _atualizar_grid_presets():
+        nonlocal _recalculando_grid
+        if _recalculando_grid:
+            return
+        _recalculando_grid = True
         for w in preset_inner.winfo_children():
             w.destroy()
         _preset_card_refs.clear()
         nomes = list(presets.keys())
-        cols = 4
+
+        card_w = 150
+        spacing = 16
+        avail = preset_canvas.winfo_width()
+        if avail > 1:
+            cols = max(1, (avail - 20) // (card_w + spacing))
+        else:
+            cols = 4
+
         for i, nome in enumerate(nomes):
             row = i // cols
             col = i % cols
             is_active = (nome == preset_ativo)
-            card = tk.Frame(preset_inner, width=150, height=100, relief="raised", borderwidth=2)
+            card = tk.Frame(preset_inner, width=card_w, height=100, relief="raised", borderwidth=2)
             card.grid(row=row, column=col, padx=8, pady=8)
             card.grid_propagate(False)
             card.configure(bg="#BBDEFB" if is_active else "#F5F5F5")
@@ -749,16 +803,17 @@ def abrir_hub_configuracao():
             lbl.bind("<Button-1>", lambda e, n=nome: _load_preset(n))
 
             if nome != "Default":
-                btn_del = tk.Button(card, text="X", font=("Segoe UI", 7, "bold"),
-                                   fg="red", bd=0, cursor="hand2",
+                btn_del = tk.Button(card, text="X", font=("Segoe UI", 8, "bold"),
+                                   fg="white", bg="#e74c3c", bd=0, cursor="hand2",
+                                   width=2, height=1,
                                    command=lambda n=nome: _apagar_preset(n))
-                btn_del.place(x=130, y=2)
+                btn_del.place(relx=1.0, rely=0.0, anchor="ne")
 
             _preset_card_refs.append(card)
 
         row = len(nomes) // cols
         col = len(nomes) % cols
-        card_plus = tk.Frame(preset_inner, width=150, height=100, relief="raised", borderwidth=2)
+        card_plus = tk.Frame(preset_inner, width=card_w, height=100, relief="raised", borderwidth=2)
         card_plus.grid(row=row, column=col, padx=8, pady=8)
         card_plus.grid_propagate(False)
 
@@ -769,10 +824,12 @@ def abrir_hub_configuracao():
         card_plus.bind("<Button-1>", lambda e: _criar_preset())
         lbl_plus.bind("<Button-1>", lambda e: _criar_preset())
         _preset_card_refs.append(card_plus)
+        _recalculando_grid = False
 
     def _load_preset(nome):
         nonlocal preset_ativo
         if nome in presets:
+            _salvar_preset_ativo()
             preset_ativo = nome
             _carregar_config_ui(presets[nome])
             _atualizar_grid_presets()
@@ -796,15 +853,18 @@ def abrir_hub_configuracao():
         entrada.focus_set()
 
         def confirmar():
+            nonlocal preset_ativo, _carregando
             nome = entrada.get().strip()
             if not nome:
                 return
             if nome in presets:
                 tk.messagebox.showwarning("Aviso", "Ja existe um preset com esse nome.", parent=dialogo)
                 return
-            presets[nome] = _coletar_config_ui()
+            presets[nome] = copy.deepcopy(presets["Default"])
             preset_ativo = nome
+            _carregando = True
             _carregar_config_ui(presets[nome])
+            _carregando = False
             _atualizar_grid_presets()
             dialogo.destroy()
 
@@ -826,8 +886,10 @@ def abrir_hub_configuracao():
         if nome == "Default":
             return
         if nome == preset_ativo:
-            preset_ativo = "Default"
-            _carregar_config_ui(presets["Default"])
+            messagebox.showwarning("Aviso", "O preset ativo nao pode ser excluido.", parent=root)
+            return
+        if not messagebox.askyesno("Confirmar", f"Excluir o preset '{nome}'?", parent=root):
+            return
         del presets[nome]
         _atualizar_grid_presets()
 
