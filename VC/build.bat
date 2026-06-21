@@ -23,7 +23,7 @@ echo.
 REM === Instala Nuitka se necessario ===
 pip show nuitka >nul 2>&1
 if errorlevel 1 (
-    echo [1/3] Instalando Nuitka...
+    echo [1/4] Instalando Nuitka...
     pip install nuitka
     if errorlevel 1 (
         echo ERRO: Falha ao instalar Nuitka.
@@ -31,11 +31,21 @@ if errorlevel 1 (
         exit /b 1
     )
 ) else (
-    echo [1/3] Nuitka ja instalado.
+    echo [1/4] Atualizando Nuitka...
+    pip install -U nuitka
+)
+
+REM === Instala/atualiza dependencias ===
+echo [2/4] Instalando dependencias...
+pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERRO: Falha ao instalar dependencias.
+    pause
+    exit /b 1
 )
 
 REM === Build com Nuitka ===
-echo [2/3] Compilando Python para C++ (otimizado)...
+echo [3/4] Compilando Python para C++ (otimizado)...
 echo.
 
 python -m nuitka --standalone ^
@@ -58,7 +68,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] Build concluido com sucesso!
+echo [4/4] Build concluido com sucesso!
 echo.
 echo ========================================
 echo  Executavel: dist\main.dist\VisionControl.exe
