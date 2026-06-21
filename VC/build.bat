@@ -67,8 +67,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM === Substitui numpy compilado pelo original (evita crash runtime) ===
+echo [4/4] Substituindo numpy pelo original (sem compilacao)...
+if exist "dist\main.dist\numpy" (
+    rmdir /s /q "dist\main.dist\numpy"
+)
+xcopy /e /i /q "..\.venv\Lib\site-packages\numpy" "dist\main.dist\numpy"
+if errorlevel 1 (
+    echo ERRO: Falha ao copiar numpy.
+    pause
+    exit /b 1
+)
+
 echo.
-echo [4/4] Build concluido com sucesso!
+echo Build concluido com sucesso!
 echo.
 echo ========================================
 echo  Executavel: dist\main.dist\VisionControl.exe
