@@ -54,6 +54,7 @@ python -m nuitka --standalone ^
     --assume-yes-for-downloads ^
     --lto=yes ^
     --jobs=%NUMBER_OF_PROCESSORS% ^
+    --nofollow-import-to=numpy ^
     --include-data-file=config.json=config.json ^
     --include-data-dir=..\.venv\Lib\site-packages\mediapipe\modules=mediapipe/modules ^
     --output-filename=VisionControl.exe ^
