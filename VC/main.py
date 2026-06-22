@@ -57,7 +57,11 @@ class VisionControlApp:
         )
 
         # Camera
+<<<<<<< HEAD
         self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
+=======
+        self.cap = cv2.VideoCapture(self.camera_id)
+>>>>>>> 3fccb43b1eb213f01ba0be34531dbe0931fc0e52
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
