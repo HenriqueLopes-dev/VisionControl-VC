@@ -1,0 +1,97 @@
+@echo off
+chcp 65001 >nul
+cd /d "%~dp0"
+
+echo ========================================
+echo  VisionControl - Nuitka Build
+echo  (Compila Python para C++ otimizado)
+echo ========================================
+echo.
+
+REM === Valida e ativa o ambiente virtual ===
+if not exist "..\.venv\Scripts\activate.bat" (
+    echo ERRO: Ambiente virtual nao encontrado em ..\.venv\
+    echo Execute primeiro: python -m venv ..\.venv
+    pause
+    exit /b 1
+)
+call ..\.venv\Scripts\activate.bat
+
+echo Python: %PYTHON_VERSION%
+echo.
+
+REM === Instala Nuitka se necessario ===
+pip show nuitka >nul 2>&1
+if errorlevel 1 (
+    echo [1/4] Instalando Nuitka...
+    pip install nuitka
+    if errorlevel 1 (
+        echo ERRO: Falha ao instalar Nuitka.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [1/4] Atualizando Nuitka...
+    pip install -U nuitka
+)
+
+REM === Instala/atualiza dependencias ===
+echo [2/4] Instalando dependencias...
+pip install -r requirements.txt
+if errorlevel 1 (
+    echo ERRO: Falha ao instalar dependencias.
+    pause
+    exit /b 1
+)
+
+REM === Build com Nuitka ===
+echo [3/4] Compilando Python para C++ (otimizado)...
+echo.
+
+python -m nuitka --standalone ^
+    --enable-plugin=tk-inter ^
+    --mingw64 ^
+    --assume-yes-for-downloads ^
+    --lto=yes ^
+    --jobs=%NUMBER_OF_PROCESSORS% ^
+    --nofollow-import-to=numpy ^
+    --no-deployment-flag=excluded-module-usage ^
+    --include-data-file=config.json=config.json ^
+    --include-data-dir=..\.venv\Lib\site-packages\mediapipe\modules=mediapipe/modules ^
+    --output-filename=VisionControl.exe ^
+    --output-dir=dist ^
+    main.py
+
+if errorlevel 1 (
+    echo.
+    echo [ERRO] Build falhou.
+    pause
+    exit /b 1
+)
+
+REM === Substitui numpy compilado pelo original (evita crash runtime) ===
+echo [4/4] Substituindo numpy pelo original (sem compilacao)...
+if exist "dist\main.dist\numpy" (
+    rmdir /s /q "dist\main.dist\numpy"
+)
+xcopy /e /i /q "..\.venv\Lib\site-packages\numpy" "dist\main.dist\numpy"
+if errorlevel 1 (
+    echo ERRO: Falha ao copiar numpy.
+    pause
+    exit /b 1
+)
+
+echo.
+echo Build concluido com sucesso!
+echo.
+echo ========================================
+echo  Executavel: dist\main.dist\VisionControl.exe
+echo  Pasta completa: dist\main.dist\
+echo.
+echo  Para distribuir, copie a pasta inteira.
+echo  Nao e necessario ter Python instalado
+echo  no computador de destino.
+echo ========================================
+echo.
+
+pause
