@@ -8,6 +8,10 @@ A proposta é criar uma solução genérica, capaz de funcionar com diferentes j
 
 ---
 
+# Apresentação
+
+[Link da apresentação do projeto no Youtube](https://youtu.be/nfDjU1znKcQ)
+
 ## Instalacao
 
 Baixe a versão <a href="https://github.com/HenriqueLopes-dev/VisionControl-VC/releases/tag/v1.0.1">release</a>, descompacte o .zip e rode o VisionControl.exe
