@@ -8,6 +8,25 @@ A proposta é criar uma solução genérica, capaz de funcionar com diferentes j
 
 ---
 
+## Instalacao
+
+Baixe a versão <a href="https://github.com/HenriqueLopes-dev/VisionControl-VC/releases/tag/v1.0.1">release</a>, descompacte o .zip e rode o VisionControl.exe
+
+Ou
+
+Baixe a pasta <a href="https://github.com/HenriqueLopes-dev/VisionControl-VC/tree/0e74734cc6905969f4836a134946385dec77c5a6/VC">VC</a>  do Projeto. Baixe o <a href="https://www.python.org/downloads/release/python-31011/">Python 3.10</a> e depois rode o comando no terminal ou Windows PowerShell:
+
+```bash
+cd VC
+pip install -r requirements.txt
+```
+
+## Como usar
+
+```bash
+python main.py
+```
+
 ## 📌 Objetivo
 
 Desenvolver um sistema capaz de reconhecer gestos das mãos por meio da câmera e convertê-los em comandos utilizados em jogos digitais.
@@ -58,23 +77,11 @@ A tela da câmera é dividida em duas zonas:
 
 ---
 
-## ✋ Gesto Neutro
-
-A mão fechada não executa nenhuma ação.
-
-Isso evita comandos acidentais durante o jogo, já que abrir e fechar a mão naturalmente poderia atrapalhar a jogabilidade.
-
-| Gesto | Ação |
-|---|---|
-| Mão fechada | Neutro |
-
----
-
-## 🕹️ Mão Esquerda — Comandos Principais
+## 🕹️ Mão Esquerda 
 
 Por padrão, a mão esquerda é usada para os comandos principais de movimentação e ações do jogo.
 
-| Gesto | Comando padrão |
+| Gesto | Ação exemplo |
 |---|---|
 | Mão fechada | Neutro |
 | 1 dedo aberto | W |
@@ -88,13 +95,13 @@ Por padrão, a mão esquerda é usada para os comandos principais de movimentaç
 
 ---
 
-## 🖱️ Mão Direita — Mouse e Ações
+## 🖱️ Mão Direita 
 
 A mão direita controla o mouse continuamente.
 
 O movimento do cursor é feito pelo centro da palma da mão, permitindo que o jogador continue mirando mesmo enquanto executa cliques ou comandos.
 
-| Gesto | Ação padrão |
+| Gesto | Ação exemplo |
 |---|---|
 | Movimento da palma | Movimento do mouse |
 | Mão fechada | Neutro |
@@ -124,36 +131,13 @@ Em um jogo de tiro, por exemplo:
 
 Antes do controle começar, o sistema abre uma janela de configuração.
 
-Nessa janela, o usuário pode alterar os comandos associados a cada gesto.
-
-Teclas disponíveis no hub:
-
-- W
-- A
-- S
-- D
-- E
-- R
-- TAB
-- 1
-- 2
-- 3
-- 4
-- Espaço
-- Ctrl esquerdo
-- Shift esquerdo
-- Alt esquerdo
-
-A mão direita também permite configurar:
-
-- Clique esquerdo
-- Clique direito
+Nessa janela, o usuário pode alterar os comandos associados a cada gesto e personalizar configurações de funcionamento e presets.
 
 ---
 
 ## 🛠 Tecnologias Utilizadas
 
-- Python 3.11
+- Python 3.10/3.11
 - OpenCV
 - MediaPipe
 - PyAutoGUI
