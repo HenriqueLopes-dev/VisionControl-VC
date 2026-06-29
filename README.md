@@ -14,7 +14,7 @@ A proposta é criar uma solução genérica, capaz de funcionar com diferentes j
 
 ## Instalacao
 
-Baixe a versão <a href="https://github.com/HenriqueLopes-dev/VisionControl-VC/releases/tag/v1.0.1">release</a>, descompacte o .zip e rode o VisionControl.exe
+Baixe a versão <a href="https://github.com/HenriqueLopes-dev/VisionControl-VC/releases/tag/v1.0.2">release</a>, descompacte o .zip e rode o VisionControl.exe
 
 Ou
 
